@@ -8,6 +8,7 @@ import { CategoryIcon } from '../lib/icons';
 import { money, toneClass } from '../lib/format';
 import { addMonths, endOfMonth, relativeDay, startOfMonth, todayISO } from '../lib/dates';
 import { download, toCSV } from '../lib/csv';
+import { excludedCategories } from '../lib/categories';
 
 const PERIODS = [
   { value: 'all', label: 'All time' },
@@ -45,6 +46,8 @@ export default function Transactions() {
   const [showFilters, setShowFilters] = useState(false);
   const [editing, setEditing] = useState(null);
   const [limit, setLimit] = useState(PAGE);
+
+  const excluded = useMemo(() => excludedCategories(settings), [settings]);
 
   const iconFor = useMemo(() => {
     const map = {};
@@ -226,7 +229,10 @@ export default function Transactions() {
                             <CategoryIcon icon={iconFor[`${t.type}:${t.category}`]} className="h-5 w-5" />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block font-semibold text-ink truncate">{t.title}</span>
+                            <span className="flex items-center gap-2 min-w-0">
+                              <span className="font-semibold text-ink truncate">{t.title}</span>
+                              {t.type === 'expense' && excluded.has(t.category) && <span className="badge bg-cream-200 text-gold-600 shrink-0">Not spending</span>}
+                            </span>
                             <span className="block text-[13px] text-muted truncate">
                               {t.category}{t.account ? ` · ${t.account}` : ''}{!byDate ? ` · ${relativeDay(t.date)}` : ''}{t.note ? ` · ${t.note}` : ''}
                             </span>

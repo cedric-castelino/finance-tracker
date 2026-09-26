@@ -1,5 +1,22 @@
 const { randomUUID } = require("crypto")
 
+const SCHEMA_VERSION = 2
+
+// Brings settings saved by older versions up to date. Returns a patch, or null if nothing changed.
+function upgradeSettings(s) {
+    if ((s.schemaVersion || 1) >= SCHEMA_VERSION) return null
+    const patch = { schemaVersion: SCHEMA_VERSION }
+    const expense = s.categories?.expense || []
+    if (!expense.some(c => c.excluded)) {
+        const existing = expense.find(c => /^invest/i.test(c.name))
+        const next = existing
+            ? expense.map(c => (c === existing ? { ...c, excluded: true } : c))
+            : [...expense.filter(c => c.name !== "Other"), { name: "Investing", icon: "trend", excluded: true }, ...expense.filter(c => c.name === "Other")]
+        patch.categories = { ...s.categories, expense: next }
+    }
+    return patch
+}
+
 function defaultSettings() {
     return {
         accounts: [
@@ -20,6 +37,7 @@ function defaultSettings() {
                 { name: "Travel", icon: "plane" },
                 { name: "Gifts", icon: "gift" },
                 { name: "Education", icon: "book" },
+                { name: "Investing", icon: "trend", excluded: true },
                 { name: "Other", icon: "dots" },
             ],
             income: [
@@ -32,8 +50,9 @@ function defaultSettings() {
             ],
         },
         prices: {},
-        preferences: { convertForeign: true, baseCurrency: "AUD" },
+        preferences: { convertForeign: true, baseCurrency: "AUD", defaultExpenseAccount: "", defaultIncomeAccount: "" },
+        schemaVersion: SCHEMA_VERSION,
     }
 }
 
-module.exports = { defaultSettings }
+module.exports = { defaultSettings, upgradeSettings }

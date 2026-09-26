@@ -87,6 +87,7 @@ function sanitizeSettings(body) {
             (Array.isArray(v) ? v : []).slice(0, 60).map(c => ({
                 name: str(60)(c.name),
                 icon: str(40)(c.icon),
+                excluded: bool(c.excluded),
             })).filter(c => c.name)
         out.categories = { expense: list(body.categories.expense), income: list(body.categories.income) }
     }
@@ -106,6 +107,8 @@ function sanitizeSettings(body) {
         out.preferences = {
             convertForeign: bool(body.preferences.convertForeign),
             baseCurrency: str(8)(body.preferences.baseCurrency) || "AUD",
+            defaultExpenseAccount: str(40)(body.preferences.defaultExpenseAccount),
+            defaultIncomeAccount: str(40)(body.preferences.defaultIncomeAccount),
         }
     }
     return out

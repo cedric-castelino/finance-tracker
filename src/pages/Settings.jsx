@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronUpIcon, ChevronDownIcon, TrashIcon, PlusIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, ArrowRightOnRectangleIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
+import { ChevronUpIcon, ChevronDownIcon, ArrowsRightLeftIcon, TrashIcon, PlusIcon, ArrowDownTrayIcon, ArrowUpTrayIcon, ArrowRightOnRectangleIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
@@ -119,6 +119,17 @@ export default function Settings() {
                 </button>
                 <input className="input !h-9 flex-1 min-w-0 !border-transparent hover:!border-cream-300 focus:!border-forest-500" value={c.name}
                   onChange={e => setList(list.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} aria-label="Category name" />
+                {catType === 'expense' && (
+                  <button
+                    className={`btn btn-icon ${c.excluded ? 'bg-gold-500/20 text-gold-600 ring-1 ring-gold-500/60' : 'btn-ghost text-muted'}`}
+                    aria-pressed={!!c.excluded}
+                    aria-label={`${c.name}: ${c.excluded ? 'not counted as spending' : 'counted as spending'}`}
+                    title={c.excluded ? 'Not counted as spending' : 'Counted as spending'}
+                    onClick={() => setList(list.map((x, j) => (j === i ? { ...x, excluded: !x.excluded } : x)))}
+                  >
+                    <ArrowsRightLeftIcon className="h-4 w-4" />
+                  </button>
+                )}
                 <button className="btn btn-ghost btn-icon" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up"><ChevronUpIcon className="h-4 w-4" /></button>
                 <button className="btn btn-ghost btn-icon" disabled={i === list.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><ChevronDownIcon className="h-4 w-4" /></button>
                 <button className="btn btn-ghost btn-icon !text-loss" onClick={() => setList(list.filter((_, j) => j !== i))} aria-label="Remove"><TrashIcon className="h-4 w-4" /></button>
@@ -130,6 +141,12 @@ export default function Settings() {
             <button className="btn btn-secondary"><PlusIcon className="h-4 w-4" /> Add</button>
           </form>
           <p className="text-xs text-muted mt-2">Renaming a category doesn’t change existing transactions. The order here is the order on the Add screen.</p>
+          {catType === 'expense' && (
+            <p className="text-xs text-muted mt-1.5 flex gap-1.5">
+              <ArrowsRightLeftIcon className="h-3.5 w-3.5 text-gold-600 shrink-0 mt-px" />
+              <span>Highlighted categories (like <b>Investing</b>) are money moved rather than spent: they show in cash flow on Insights but aren’t counted as spending.</span>
+            </p>
+          )}
           <div className="flex justify-end gap-2 mt-4">
             {catsDirty && <button className="btn btn-ghost" onClick={() => setCats(settings.categories)}>Discard</button>}
             <button className="btn btn-primary" disabled={!catsDirty} onClick={saveCats}>Save categories</button>
@@ -145,6 +162,24 @@ export default function Settings() {
                 <div className="text-sm text-muted truncate">{user.email}</div>
               </div>
               <button className="btn btn-secondary btn-sm" onClick={() => { logout(); navigate('/login'); }}><ArrowRightOnRectangleIcon className="h-4 w-4" /> Sign out</button>
+            </div>
+          </Card>
+
+          <Card title="Defaults">
+            <p className="text-sm text-ink-soft mb-3">Pre-selected on the Add screen. You can still change it for each transaction.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[['defaultExpenseAccount', 'Expenses paid from'], ['defaultIncomeAccount', 'Income paid into']].map(([key, label]) => (
+                <div key={key}>
+                  <label className="label" htmlFor={key}>{label}</label>
+                  <select id={key} className="input" value={settings.preferences?.[key] || ''}
+                    onChange={e => saveSettings({ preferences: { ...settings.preferences, [key]: e.target.value } })
+                      .then(() => toast('Default saved'))
+                      .catch(err => toast(err.message, { tone: 'error' }))}>
+                    <option value="">No default</option>
+                    {(settings.accounts || []).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              ))}
             </div>
           </Card>
 

@@ -6,14 +6,19 @@ import { useToast } from '../context/ToastContext';
 import { PageHeader, Segmented, Spinner } from '../components/ui';
 import { CategoryIcon } from '../lib/icons';
 import { money } from '../lib/format';
+import { excludedCategories } from '../lib/categories';
 import { addDays, relativeDay, todayISO, startOfMonth } from '../lib/dates';
 
-const blank = type => ({ type, amount: '', title: '', category: '', account: '', date: todayISO(), note: '' });
+const blank = (type, account = '') => ({ type, amount: '', title: '', category: '', account, date: todayISO(), note: '' });
 
 export default function AddTransaction() {
   const { settings, transactions, debts, add, addMany } = useData();
   const toast = useToast();
-  const [form, setForm] = useState(() => blank('expense'));
+  const defaultAccount = type => {
+    const id = settings?.preferences?.[type === 'income' ? 'defaultIncomeAccount' : 'defaultExpenseAccount'];
+    return (settings?.accounts || []).find(a => a.id === id)?.name || '';
+  };
+  const [form, setForm] = useState(() => blank('expense', defaultAccount('expense')));
   const [showNote, setShowNote] = useState(false);
   const [split, setSplit] = useState(false);
   const [splitRows, setSplitRows] = useState([{ person: '', amount: '' }]);
@@ -24,6 +29,7 @@ export default function AddTransaction() {
   const categoryTouched = useRef(false);
 
   const categories = settings?.categories?.[form.type] || [];
+  const excluded = useMemo(() => excludedCategories(settings), [settings]);
   const accounts = settings?.accounts || [];
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -50,11 +56,11 @@ export default function AddTransaction() {
     let spent = 0, earned = 0;
     transactions.forEach(t => {
       if (t.date < from) return;
-      if (t.type === 'expense') spent += t.amount;
-      else earned += t.amount;
+      if (t.type === 'income') earned += t.amount;
+      else if (!excluded.has(t.category)) spent += t.amount;
     });
     return { spent, earned };
-  }, [transactions]);
+  }, [transactions, excluded]);
 
   const amountNum = parseFloat(form.amount) || 0;
   const owedTotal = split ? splitRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
@@ -75,7 +81,8 @@ export default function AddTransaction() {
 
   const switchType = type => {
     categoryTouched.current = false;
-    setForm(f => ({ ...f, type, category: '' }));
+    // Swap to the other type's default account unless the user picked one themselves.
+    setForm(f => ({ ...f, type, category: '', account: f.account === defaultAccount(f.type) ? defaultAccount(type) : f.account }));
     if (type === 'income') setSplit(false);
   };
 
@@ -110,7 +117,7 @@ export default function AddTransaction() {
       }
       toast(`${form.type === 'expense' ? 'Expense' : 'Income'} of ${money(recorded)} saved${splits.length ? ` · ${splits.length} IOU${splits.length > 1 ? 's' : ''} added` : ''}`);
       categoryTouched.current = false;
-      setForm(blank(form.type));
+      setForm(blank(form.type, defaultAccount(form.type)));
       setSplit(false);
       setSplitRows([{ person: '', amount: '' }]);
       setShowNote(false);

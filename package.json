@@ -9,7 +9,8 @@
     "build": "vite build",
     "start": "node server/server.cjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "migrate:mongo": "node server/migrate-to-mongo.cjs"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

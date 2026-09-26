@@ -111,6 +111,9 @@ function createMongoStore(uri, dbName) {
 
 async function createStore() {
     const uri = process.env.ATLAS_URI || process.env.MONGODB_URI
+    if (!uri && process.env.NODE_ENV === "production") {
+        throw new Error("ATLAS_URI must be set in production - the local file store would be wiped on each deploy.")
+    }
     const store = uri
         ? createMongoStore(uri, process.env.DB_NAME || "FinanceTracker")
         : createFileStore(process.env.DATA_FILE || path.join(__dirname, "data", "db.json"))

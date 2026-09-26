@@ -11,6 +11,7 @@ import {
   addDays, addMonths, daysBetween, endOfMonth, formatDate, monthKey, monthLabel, monthsBetween, startOfMonth, todayISO, weekdayIndex, WEEKDAYS, parseISO,
 } from '../lib/dates';
 import { SERIES, OTHER, INCOME, EXPENSE, CHART } from '../lib/colors';
+import { excludedCategories, kindOf } from '../lib/categories';
 
 const RANGES = [
   { value: '1m', label: '1M' },
@@ -34,10 +35,14 @@ function rangeFor(value, earliest) {
   }
 }
 
+const INVESTED = SERIES[2];
+
 const axisProps = { stroke: CHART.axis, fontSize: 12, tickLine: false, axisLine: false };
 
 export default function Insights() {
-  const { transactions } = useData();
+  const { transactions, settings } = useData();
+  const excluded = useMemo(() => excludedCategories(settings), [settings]);
+  const isSpend = t => t.type === 'expense' && !excluded.has(t.category);
   const [range, setRange] = useState('6m');
   const [focusCat, setFocusCat] = useState(null);
 
@@ -51,22 +56,28 @@ export default function Insights() {
   // Stable colour per category, based on all-time spending rank (so filters never repaint).
   const catColor = useMemo(() => {
     const totals = {};
-    transactions.forEach(t => { if (t.type === 'expense') totals[t.category] = (totals[t.category] || 0) + t.amount; });
+    transactions.forEach(t => { if (isSpend(t)) totals[t.category] = (totals[t.category] || 0) + t.amount; });
     const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([k]) => k).filter(k => k !== 'Other');
     const map = {};
     ranked.forEach((c, i) => { map[c] = i < SERIES.length - 1 ? SERIES[i] : OTHER; });
     map.Other = OTHER;
     return map;
-  }, [transactions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, excluded]);
   const colorOf = c => catColor[c] || OTHER;
 
   const stats = useMemo(() => {
     const cur = transactions.filter(t => t.date >= from && t.date <= to);
     const prev = transactions.filter(t => t.date >= prevFrom && t.date <= prevTo);
     const agg = list => {
-      let income = 0, expense = 0;
-      list.forEach(t => { if (t.type === 'income') income += t.amount; else expense += t.amount; });
-      return { income, expense, net: income - expense, rate: income > 0 ? (income - expense) / income : null };
+      let income = 0, expense = 0, invested = 0;
+      list.forEach(t => {
+        const k = kindOf(t, excluded);
+        if (k === 'income') income += t.amount;
+        else if (k === 'invested') invested += t.amount;
+        else expense += t.amount;
+      });
+      return { income, expense, invested, net: income - expense, rate: income > 0 ? (income - expense) / income : null };
     };
     const a = agg(cur);
     const b = agg(prev);
@@ -75,18 +86,18 @@ export default function Insights() {
     const keys = daily
       ? Array.from({ length: spanDays }, (_, i) => addDays(from, i))
       : monthsBetween(from, to);
-    const buckets = Object.fromEntries(keys.map(k => [k, { key: k, income: 0, expense: 0 }]));
+    const buckets = Object.fromEntries(keys.map(k => [k, { key: k, income: 0, expense: 0, invested: 0 }]));
     cur.forEach(t => {
       const k = daily ? t.date : monthKey(t.date);
-      if (buckets[k]) buckets[k][t.type] += t.amount;
+      if (buckets[k]) buckets[k][kindOf(t, excluded)] += t.amount;
     });
     const flow = keys.map(k => ({ ...buckets[k], net: buckets[k].income - buckets[k].expense }));
 
     // Category breakdown
     const catTotals = {};
     const prevCat = {};
-    cur.forEach(t => { if (t.type === 'expense') catTotals[t.category] = (catTotals[t.category] || 0) + t.amount; });
-    prev.forEach(t => { if (t.type === 'expense') prevCat[t.category] = (prevCat[t.category] || 0) + t.amount; });
+    cur.forEach(t => { if (isSpend(t)) catTotals[t.category] = (catTotals[t.category] || 0) + t.amount; });
+    prev.forEach(t => { if (isSpend(t)) prevCat[t.category] = (prevCat[t.category] || 0) + t.amount; });
     const categories = Object.entries(catTotals)
       .map(([name, value]) => ({ name, value, prev: prevCat[name] || 0, share: a.expense ? value / a.expense : 0 }))
       .sort((x, y) => y.value - x.value);
@@ -110,7 +121,7 @@ export default function Insights() {
     });
     const tIdx = Object.fromEntries(months.map((m, i) => [m, i]));
     cur.forEach(t => {
-      if (t.type !== 'expense') return;
+      if (!isSpend(t)) return;
       const row = trend[tIdx[monthKey(t.date)]];
       if (!row) return;
       const c = trendCats.includes(t.category) ? t.category : 'Other';
@@ -120,20 +131,20 @@ export default function Insights() {
     // Weekday averages
     const weeksInRange = Math.max(1, spanDays / 7);
     const wd = WEEKDAYS.map(d => ({ day: d, total: 0 }));
-    cur.forEach(t => { if (t.type === 'expense' && (!focusCat || t.category === focusCat)) wd[weekdayIndex(t.date)].total += t.amount; });
+    cur.forEach(t => { if (isSpend(t) && (!focusCat || t.category === focusCat)) wd[weekdayIndex(t.date)].total += t.amount; });
     wd.forEach(d => { d.avg = d.total / weeksInRange; });
 
     // Top payees & largest
     const payees = {};
     cur.forEach(t => {
-      if (t.type !== 'expense') return;
+      if (!isSpend(t)) return;
       const k = t.title.trim().toLowerCase();
       payees[k] = payees[k] || { title: t.title, total: 0, count: 0 };
       payees[k].total += t.amount;
       payees[k].count++;
     });
     const topPayees = Object.values(payees).sort((x, y) => y.total - x.total).slice(0, 8);
-    const largest = cur.filter(t => t.type === 'expense').sort((x, y) => y.amount - x.amount).slice(0, 6);
+    const largest = cur.filter(isSpend).sort((x, y) => y.amount - x.amount).slice(0, 6);
 
     const incomeSources = {};
     cur.forEach(t => { if (t.type === 'income') incomeSources[t.category] = (incomeSources[t.category] || 0) + t.amount; });
@@ -147,7 +158,7 @@ export default function Insights() {
       count: cur.length,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, from, to, prevFrom, prevTo, daily, spanDays, catColor, focusCat]);
+  }, [transactions, from, to, prevFrom, prevTo, daily, spanDays, catColor, focusCat, excluded]);
 
   // Month-to-date pace vs last month (independent of range)
   const pace = useMemo(() => {
@@ -159,7 +170,7 @@ export default function Insights() {
     const cumThis = Array(days).fill(0);
     const cumLast = Array(days).fill(0);
     transactions.forEach(tx => {
-      if (tx.type !== 'expense') return;
+      if (!isSpend(tx)) return;
       if (focusCat && tx.category !== focusCat) return;
       if (tx.date >= thisStart && tx.date <= t) cumThis[parseISO(tx.date).getDate() - 1] += tx.amount;
       else if (tx.date >= lastStart && tx.date <= lastEnd) cumLast[parseISO(tx.date).getDate() - 1] += tx.amount;
@@ -174,7 +185,8 @@ export default function Insights() {
       rows.push({ day: i + 1, 'This month': i < today ? a : null, 'Last month': i < lastDays ? b : null });
     }
     return { rows, thisTotal: a, lastSameDay: rows[today - 1]?.['Last month'] ?? b, lastTotal: b, thisLabel: monthLabel(monthKey(thisStart)), lastLabel: monthLabel(monthKey(lastStart)) };
-  }, [transactions, focusCat]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactions, focusCat, excluded]);
 
   if (!transactions.length) {
     return (
@@ -207,13 +219,13 @@ export default function Insights() {
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4 mb-5">
         <Stat label="Income" value={money(a.income)} icon={ArrowTrendingUpIcon} sub={<Compare cur={a.income} prev={b.income} good="up" />} />
         <Stat label="Spending" value={money(a.expense)} icon={ArrowTrendingDownIcon} sub={<Compare cur={a.expense} prev={b.expense} good="down" />} />
-        <Stat label="Net saved" value={money(a.net, { sign: true })} tone={toneClass(a.net)} icon={BanknotesIcon} sub={`${money(stats.avgDaily)} avg daily spend`} />
+        <Stat label="Net saved" value={money(a.net, { sign: true })} tone={toneClass(a.net)} icon={BanknotesIcon} sub={a.invested > 0 ? `incl. ${money(a.invested)} invested` : `${money(stats.avgDaily)} avg daily spend`} />
         <Stat label="Savings rate" value={a.rate == null ? '—' : pct(a.rate, { digits: 1 })} tone={a.rate == null ? '' : toneClass(a.rate)} icon={ScaleIcon}
           sub={b.rate == null ? `${stats.count} transactions` : `${pct(b.rate, { digits: 1 })} previous period`} />
       </div>
 
       <div className="grid gap-4 md:gap-5 xl:grid-cols-3 mb-5">
-        <Card title="Cash flow" className="xl:col-span-2" action={<Legend items={[{ label: 'Income', color: INCOME }, { label: 'Spending', color: EXPENSE }]} />}>
+        <Card title="Cash flow" className="xl:col-span-2" action={<Legend items={[{ label: 'Income', color: INCOME }, { label: 'Spending', color: EXPENSE }, ...(a.invested > 0 ? [{ label: 'Invested', color: INVESTED }] : [])]} />}>
           <div className="h-[260px] -ml-2">
             <ResponsiveContainer>
               <BarChart data={stats.flow} barGap={2} barCategoryGap={daily ? '15%' : '28%'}>
@@ -223,6 +235,7 @@ export default function Insights() {
                 <Tooltip cursor={{ fill: 'rgba(26,77,57,0.06)' }} content={<ChartTooltip labelFormatter={bucketLabel} />} />
                 <Bar dataKey="income" name="Income" fill={INCOME} radius={[4, 4, 0, 0]} maxBarSize={28} />
                 <Bar dataKey="expense" name="Spending" fill={EXPENSE} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                {a.invested > 0 && <Bar dataKey="invested" name="Invested" fill={INVESTED} radius={[4, 4, 0, 0]} maxBarSize={28} />}
               </BarChart>
             </ResponsiveContainer>
           </div>

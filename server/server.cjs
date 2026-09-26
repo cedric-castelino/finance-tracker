@@ -10,7 +10,7 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const { createStore } = require("./db.cjs")
 const { schemas, sanitize, sanitizeSettings } = require("./schemas.cjs")
-const { defaultSettings } = require("./defaults.cjs")
+const { defaultSettings, upgradeSettings } = require("./defaults.cjs")
 const { getQuotes, getHistory, parseSymbols } = require("./quotes.cjs")
 
 const PORT = process.env.PORT || 3000
@@ -72,6 +72,8 @@ async function main() {
     const api = express.Router()
 
     // ---- Auth ----
+    api.get("/health", (req, res) => res.json({ ok: true, storage: store.kind }))
+
     api.get("/auth/config", (req, res) => res.json({ allowRegistration: ALLOW_REGISTRATION }))
 
     api.post("/auth/register", throttle, asyncRoute(async (req, res) => {
@@ -126,6 +128,8 @@ async function main() {
             s = { userId, ...defaultSettings() }
             await store.insertMany("settings", [s])
         }
+        const upgrade = upgradeSettings(s)
+        if (upgrade) s = await store.updateOne("settings", { userId }, upgrade)
         const { userId: _, ...rest } = s
         return rest
     }
