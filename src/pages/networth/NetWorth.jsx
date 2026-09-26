@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { CameraIcon, Cog6ToothIcon, TrashIcon, PlusIcon, ArrowRightIcon, BuildingLibraryIcon } from '@heroicons/react/24/outline';
@@ -25,13 +25,32 @@ const RANGES = [
   { value: 'all', label: 'All' },
 ];
 
+const round2 = v => Math.round(v * 100) / 100;
+
+function inputValue(a) {
+  if (a.type === 'credit') return a.limit > 0 ? String(round2(a.limit - (a.balance || 0))) : '';
+  return String(a.balance ?? '');
+}
+
+function balanceFromInput(a, raw) {
+  const v = parseFloat(raw);
+  if (a.type === 'credit') {
+    if (!(a.limit > 0)) return a.balance || 0;
+    return round2(a.limit - (Number.isNaN(v) ? a.limit - (a.balance || 0) : v));
+  }
+  return Number.isNaN(v) ? 0 : v;
+}
+
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
 export default function NetWorth() {
   const { settings, snapshots, portfolio, owedTotal, saveSettings, add, remove } = useData();
   const toast = useToast();
   const savedAccounts = useMemo(() => settings?.accounts || [], [settings?.accounts]);
-  const [draft, setDraft] = useState(() => Object.fromEntries(savedAccounts.map(a => [a.id, String(a.balance ?? '')])));
+  // Cash/asset inputs hold the balance; credit card inputs hold the *available* amount,
+  // and the amount owing is worked out as limit - available.
+  const [draft, setDraft] = useState(() => Object.fromEntries(savedAccounts.map(a => [a.id, inputValue(a)])));
+  const touched = useRef(new Set());
   const [saving, setSaving] = useState(false);
   const [managing, setManaging] = useState(false);
   const [deleting, setDeleting] = useState(null);
@@ -41,13 +60,13 @@ export default function NetWorth() {
   useEffect(() => {
     setDraft(d => {
       const next = {};
-      savedAccounts.forEach(a => { next[a.id] = a.id in d ? d[a.id] : String(a.balance ?? ''); });
+      savedAccounts.forEach(a => { next[a.id] = touched.current.has(a.id) && a.id in d ? d[a.id] : inputValue(a); });
       return next;
     });
   }, [savedAccounts]);
 
-  const accounts = savedAccounts.map(a => ({ ...a, balance: parseFloat(draft[a.id]) || 0 }));
-  const dirty = savedAccounts.some(a => (parseFloat(draft[a.id]) || 0) !== (a.balance || 0));
+  const accounts = savedAccounts.map(a => ({ ...a, balance: balanceFromInput(a, draft[a.id]) }));
+  const dirty = accounts.some((a, i) => Math.abs(a.balance - (savedAccounts[i].balance || 0)) > 0.004);
   const investments = portfolio.totals.value;
   const nw = computeNetWorth(accounts, investments, owedTotal);
 
@@ -61,6 +80,7 @@ export default function NetWorth() {
 
   const saveBalances = async () => {
     await saveSettings({ accounts: accounts.map(({ id, name, type, balance, limit }) => ({ id, name, type, balance, limit })) });
+    touched.current.clear();
   };
 
   const onSaveBalances = async () => {
@@ -103,15 +123,15 @@ export default function NetWorth() {
   const others = accounts.filter(a => a.type === 'asset');
   const credits = accounts.filter(a => a.type === 'credit');
 
-  const balanceInput = a => (
+  const balanceInput = (a, label = 'balance') => (
     <div className="relative w-36 shrink-0">
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">$</span>
       <input
         className="input num text-right !h-10 !pl-6"
         inputMode="decimal"
-        aria-label={`${a.name} balance`}
+        aria-label={`${a.name} ${label}`}
         value={draft[a.id] ?? ''}
-        onChange={e => setDraft(d => ({ ...d, [a.id]: e.target.value.replace(/[^0-9.-]/g, '') }))}
+        onChange={e => { touched.current.add(a.id); setDraft(d => ({ ...d, [a.id]: e.target.value.replace(/[^0-9.-]/g, '') })); }}
         onFocus={e => e.target.select()}
       />
     </div>
@@ -182,16 +202,29 @@ export default function NetWorth() {
 
             <section>
               <div className="flex justify-between text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">
-                <span>Credit cards (owing)</span><span className="num text-loss">{money(-nw.credit)}</span>
+                <span>Credit cards · enter available</span><span className="num text-loss">{money(-nw.credit)}</span>
               </div>
               <ul className="space-y-2.5">
                 {credits.map(a => (
                   <li key={a.id} className="flex items-center gap-3">
                     <span className="flex-1 min-w-0">
                       <span className="block truncate text-sm font-medium">{a.name}</span>
-                      {a.limit > 0 && <span className="block text-xs text-muted num">{money(a.limit - a.balance)} available of {money(a.limit)}</span>}
+                      {a.limit > 0 ? (
+                        <span className="block text-xs text-muted num">
+                          Owing <span className={a.balance > 0 ? 'text-loss font-semibold' : 'font-semibold'}>{money(a.balance)}</span> of {money(a.limit)} limit
+                        </span>
+                      ) : (
+                        <button className="block text-xs text-loss font-semibold underline underline-offset-2" onClick={() => setManaging(true)}>Set a credit limit first</button>
+                      )}
                     </span>
-                    {balanceInput(a)}
+                    {a.limit > 0 ? (
+                      <div className="shrink-0 text-right">
+                        {balanceInput(a, 'available balance')}
+                        <span className="block text-[11px] text-muted mt-0.5 pr-1">available</span>
+                      </div>
+                    ) : (
+                      <div className="w-36 shrink-0 text-right text-sm text-muted">—</div>
+                    )}
                   </li>
                 ))}
                 {!credits.length && <li className="text-sm text-muted">No credit cards.</li>}
@@ -313,7 +346,7 @@ function ManageAccounts({ onClose }) {
     <Modal open onClose={onClose} wide title="Accounts"
       footer={<><button className="btn btn-secondary" onClick={onClose}>Cancel</button><button className="btn btn-primary" onClick={save}>Save accounts</button></>}>
       <p className="text-sm text-ink-soft mb-4">
-        <b>Cash</b> accounts and <b>credit cards</b> make up your liquid net worth. <b>Other assets</b> (e.g. super, a car) count toward net worth only.
+        <b>Cash</b> accounts and <b>credit cards</b> make up your liquid net worth. <b>Other assets</b> (e.g. super, a car) count toward net worth only. Credit cards need a limit — on the Net Worth page you type the card’s available balance and the amount owing is worked out from the limit.
       </p>
       <div className="space-y-3">
         {rows.map((r, i) => (
