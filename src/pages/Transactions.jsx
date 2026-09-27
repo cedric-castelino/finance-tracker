@@ -173,7 +173,7 @@ export default function Transactions() {
               <option value="smallest">Smallest amount</option>
             </select>
             {period === 'custom' && (
-              <div className="sm:col-span-2 lg:col-span-5 grid grid-cols-2 gap-3">
+              <div className="sm:col-span-2 lg:col-span-5 grid grid-cols-2 gap-3 [&>*]:min-w-0">
                 <input type="date" className="input" aria-label="From" value={custom.from} onChange={e => setCustom(c => ({ ...c, from: e.target.value }))} />
                 <input type="date" className="input" aria-label="To" value={custom.to} onChange={e => setCustom(c => ({ ...c, to: e.target.value }))} />
               </div>

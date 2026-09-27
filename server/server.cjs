@@ -60,7 +60,21 @@ function requireAuth(req, res, next) {
 }
 
 const signToken = user => jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: "180d" })
-const publicUser = u => ({ id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName })
+const publicUser = u => ({
+    id: u.id,
+    email: u.email,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    apiKey: u.apiKeyHash ? { hint: u.apiKeyHint, createdAt: u.apiKeyCreatedAt } : null,
+})
+
+// Personal API keys (for Apple Shortcuts etc.) are random 32-byte tokens; only a SHA-256 hash is stored.
+const hashKey = key => crypto.createHash("sha256").update(key).digest("hex")
+const API_KEY_PREFIX = "ldg_"
+
+// "Today" for requests that don't send a date, in the user's timezone rather than the server's.
+const DEFAULT_TZ = process.env.DEFAULT_TIMEZONE || "Australia/Sydney"
+const todayIn = tz => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())
 
 async function main() {
     const store = await createStore()
@@ -112,6 +126,22 @@ async function main() {
     api.get("/auth/me", requireAuth, asyncRoute(async (req, res) => {
         const user = await store.findOne("users", { id: req.userId })
         if (!user) return res.status(401).json({ error: "Account not found" })
+        res.json({ user: publicUser(user) })
+    }))
+
+    api.post("/auth/api-key", requireAuth, asyncRoute(async (req, res) => {
+        const key = API_KEY_PREFIX + crypto.randomBytes(32).toString("base64url")
+        const user = await store.updateOne("users", { id: req.userId }, {
+            apiKeyHash: hashKey(key),
+            apiKeyHint: key.slice(-4),
+            apiKeyCreatedAt: new Date().toISOString(),
+        })
+        if (!user) return res.status(401).json({ error: "Account not found" })
+        res.json({ key, user: publicUser(user) })
+    }))
+
+    api.delete("/auth/api-key", requireAuth, asyncRoute(async (req, res) => {
+        const user = await store.updateOne("users", { id: req.userId }, { apiKeyHash: null, apiKeyHint: null, apiKeyCreatedAt: null })
         res.json({ user: publicUser(user) })
     }))
 
@@ -171,6 +201,71 @@ async function main() {
             await store.updateOne("settings", { userId: req.userId }, sanitizeSettings(body.settings), { upsert: true })
         }
         res.json({ ok: true })
+    }))
+
+    // ---- Apple Shortcuts ----
+    const requireApiKey = asyncRoute(async (req, res, next) => {
+        const header = req.headers.authorization || ""
+        const key = (header.startsWith("Bearer ") ? header.slice(7) : req.headers["x-api-key"] || "").trim()
+        if (!key.startsWith(API_KEY_PREFIX)) return res.status(401).json({ error: "Missing API key", message: "Missing API key - check the Authorization header in your shortcut." })
+        const user = await store.findOne("users", { apiKeyHash: hashKey(key) })
+        if (!user) return res.status(401).json({ error: "Invalid API key", message: "That API key isn’t valid - generate a new one in Ledger’s Settings." })
+        req.userId = user.id
+        next()
+    })
+
+    // Lists for "Choose from List" actions in a shortcut.
+    api.get("/shortcut/options", requireApiKey, asyncRoute(async (req, res) => {
+        const s = await getSettings(req.userId)
+        res.json({
+            expense: (s.categories?.expense || []).map(c => c.name),
+            income: (s.categories?.income || []).map(c => c.name),
+            accounts: (s.accounts || []).map(a => a.name),
+        })
+    }))
+
+    api.post("/shortcut/transaction", requireApiKey, asyncRoute(async (req, res) => {
+        const body = req.body || {}
+        const s = await getSettings(req.userId)
+        const type = /^inc/i.test(String(body.type || "")) ? "income" : "expense"
+        const amount = Math.abs(parseFloat(String(body.amount ?? "").replace(/[^0-9.-]/g, "")))
+        if (!(amount > 0)) return res.status(400).json({ error: "Invalid amount", message: "Enter an amount greater than $0." })
+
+        const categories = s.categories?.[type] || []
+        const wanted = String(body.category || "").trim().toLowerCase()
+        const category = categories.find(c => c.name.toLowerCase() === wanted)?.name
+            || categories.find(c => c.name.toLowerCase() === "other")?.name
+            || categories[0]?.name
+            || "Other"
+
+        const accounts = s.accounts || []
+        const wantedAccount = String(body.account || "").trim().toLowerCase()
+        const defaultId = s.preferences?.[type === "income" ? "defaultIncomeAccount" : "defaultExpenseAccount"]
+        const account = accounts.find(a => a.name.toLowerCase() === wantedAccount)?.name
+            || accounts.find(a => a.id === defaultId)?.name
+            || ""
+
+        const title = String(body.title || body.description || "").trim() || category
+        // Accept 2026-09-27 or 27/09/2026 (Shortcuts' default short date); otherwise use today.
+        const rawDate = String(body.date || "").trim()
+        const dm = rawDate.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/)
+        const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+            ? rawDate
+            : dm ? `${dm[3]}-${dm[2].padStart(2, "0")}-${dm[1].padStart(2, "0")}` : todayIn(DEFAULT_TZ)
+        const doc = {
+            ...sanitize("transactions", { type, amount, title, category, account, note: body.note, date }),
+            id: crypto.randomUUID(),
+            userId: req.userId,
+            createdAt: new Date().toISOString(),
+        }
+        await store.insertMany("transactions", [doc])
+        const { userId, ...transaction } = doc
+        const fmt = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(amount)
+        res.json({
+            ok: true,
+            message: `${type === "income" ? "Income" : "Expense"} saved: ${fmt} ${title} (${category})`,
+            transaction,
+        })
     }))
 
     const checkCollection = (req, res, next) =>

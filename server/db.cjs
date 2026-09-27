@@ -81,6 +81,7 @@ function createMongoStore(uri, dbName) {
             await Promise.all([
                 db.collection("users").createIndex({ email: 1 }, { unique: true }),
                 db.collection("users").createIndex({ id: 1 }, { unique: true }),
+                db.collection("users").createIndex({ apiKeyHash: 1 }),
                 ...COLLECTIONS.filter(c => c !== "users").map(c => db.collection(c).createIndex({ userId: 1, id: 1 })),
             ])
         },

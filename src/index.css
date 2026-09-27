@@ -96,6 +96,20 @@
   textarea.input {
     @apply h-auto py-2.5;
   }
+  /* iOS Safari gives date inputs an intrinsic width that ignores w-full, so they
+     overflow their column; reset the native appearance and left-align the value. */
+  input[type="date"].input {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    line-height: 2.75rem;
+  }
+  input[type="date"].input::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
   .btn {
     @apply inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl font-semibold text-[15px] md:text-sm
       transition active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none whitespace-nowrap;

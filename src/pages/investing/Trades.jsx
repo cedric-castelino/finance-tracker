@@ -290,7 +290,7 @@ function TradeForm({ trade, onDone, embedded = false }) {
     <form onSubmit={submit} className="space-y-4">
       <Segmented value={form.side} onChange={v => set('side', v)} size="lg" className="w-full"
         options={[{ value: 'buy', label: 'Buy' }, { value: 'sell', label: 'Sell' }]} />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 [&>*]:min-w-0">
         <div>
           <label className="label" htmlFor="t-ticker">Ticker</label>
           <input id="t-ticker" className="input uppercase" list="t-tickers" autoComplete="off" autoCapitalize="characters" placeholder="IVV"
@@ -312,7 +312,7 @@ function TradeForm({ trade, onDone, embedded = false }) {
           <input id="t-name" className="input" placeholder="Auto-filled from ticker" value={form.name} onChange={e => set('name', e.target.value)} />
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 [&>*]:min-w-0">
         <div>
           <label className="label" htmlFor="t-date">Date</label>
           <input id="t-date" type="date" className="input" value={form.date} onChange={e => e.target.value && set('date', e.target.value)} />
