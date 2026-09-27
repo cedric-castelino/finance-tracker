@@ -78,7 +78,7 @@ The server serves both the API and the website, so you only deploy one service. 
 
 Every push to the tracked branch redeploys automatically. Your data lives in Atlas, so redeploys never touch it.
 
-**About the free plan:** Render's free service goes to sleep after about 15 minutes idle, and the first visit afterwards takes roughly 30–60 seconds to wake it. To avoid that, upgrade the service to Render's *Starter* plan, or use a free uptime pinger (e.g. cron-job.org) to request `https://your-url/api/health` every 10 minutes.
+**About the free plan:** Render's free services go to sleep after about 15 minutes without visits, and the next request takes roughly 30–60 seconds to wake them. To avoid that, the server pings its own public URL (`RENDER_EXTERNAL_URL`, which Render sets automatically) every 10 minutes, so it never falls asleep and the website and Apple Shortcut respond immediately. One always-on service uses about 730 of the free plan's 750 monthly instance hours; that allowance is shared across your workspace, so a second free service would run out. To turn the ping off, set `KEEP_AWAKE=false`. Upgrading to Render's *Starter* plan also removes sleeping.
 
 Other Node hosts (Railway, Fly.io, a VPS) work the same way: build with `npm ci --include=dev && npm run build`, start with `npm start`, and set `NODE_ENV=production`, `ATLAS_URI` and `JWT_SECRET`.
 
