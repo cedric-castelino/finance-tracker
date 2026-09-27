@@ -12,6 +12,7 @@ const { createStore } = require("./db.cjs")
 const { schemas, sanitize, sanitizeSettings } = require("./schemas.cjs")
 const { defaultSettings, upgradeSettings } = require("./defaults.cjs")
 const { getQuotes, getHistory, parseSymbols } = require("./quotes.cjs")
+const { processRecurring } = require("./recurring.cjs")
 
 const PORT = process.env.PORT || 3000
 const DATA_COLLECTIONS = Object.keys(schemas)
@@ -165,6 +166,7 @@ async function main() {
     }
 
     api.get("/data", requireAuth, asyncRoute(async (req, res) => {
+        await processRecurring(store, req.userId, todayIn(DEFAULT_TZ))
         const [settings, ...lists] = await Promise.all([
             getSettings(req.userId),
             ...DATA_COLLECTIONS.map(c => store.find(c, { userId: req.userId })),

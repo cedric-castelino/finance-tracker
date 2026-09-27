@@ -3,7 +3,10 @@
 const fs = require("fs")
 const path = require("path")
 
-const COLLECTIONS = ["users", "transactions", "trades", "snapshots", "debts", "settings"]
+const { schemas } = require("./schemas.cjs")
+
+// Every data collection is defined by its schema, so new ones are picked up automatically.
+const COLLECTIONS = ["users", ...Object.keys(schemas), "settings"]
 
 function createFileStore(file) {
     let data = {}

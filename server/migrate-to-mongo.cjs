@@ -8,7 +8,9 @@ const fs = require("fs")
 const path = require("path")
 const { MongoClient, ServerApiVersion } = require("mongodb")
 
-const COLLECTIONS = ["transactions", "trades", "snapshots", "debts", "settings"]
+const { schemas } = require("./schemas.cjs")
+
+const COLLECTIONS = [...Object.keys(schemas), "settings"]
 
 async function main() {
     const uri = process.env.ATLAS_URI || process.env.MONGODB_URI

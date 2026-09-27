@@ -4,7 +4,7 @@ import { computePortfolio, fxKey, quoteSymbol } from '../lib/portfolio';
 import { outstandingOwed } from '../lib/networth';
 
 const DataContext = createContext(null);
-const EMPTY = { transactions: [], trades: [], snapshots: [], debts: [], settings: null };
+const EMPTY = { transactions: [], trades: [], snapshots: [], debts: [], recurring: [], settings: null };
 
 export function DataProvider({ children }) {
   const [data, setData] = useState(EMPTY);
