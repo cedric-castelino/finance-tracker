@@ -83,7 +83,7 @@ export function Delta({ value, percent, className = '' }) {
 
 export function Card({ title, action, children, className = '', pad = true }) {
   return (
-    <section className={`card ${className}`}>
+    <section className={`card min-w-0 ${className}`}>
       {(title || action) && (
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 md:px-5 pt-4 md:pt-5">
           {title && <h2 className="card-title">{title}</h2>}

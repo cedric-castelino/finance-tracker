@@ -59,7 +59,7 @@ export default function TransactionEditor({ transaction, onClose }) {
           size="lg"
           options={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
           <div>
             <label className="label" htmlFor="e-amount">Amount</label>
             <input id="e-amount" className="input num" inputMode="decimal" value={form.amount} onChange={e => set('amount', e.target.value.replace(/[^0-9.]/g, ''))} />
@@ -73,7 +73,7 @@ export default function TransactionEditor({ transaction, onClose }) {
           <label className="label" htmlFor="e-title">Description</label>
           <input id="e-title" className="input" value={form.title} onChange={e => set('title', e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
           <div>
             <label className="label" htmlFor="e-cat">Category</label>
             <select id="e-cat" className="input" value={form.category} onChange={e => set('category', e.target.value)}>

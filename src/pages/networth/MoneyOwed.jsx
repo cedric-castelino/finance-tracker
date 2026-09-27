@@ -104,7 +104,7 @@ export default function MoneyOwed() {
               <input id="o-person" className="input" list="o-people" autoComplete="off" value={form.person} onChange={e => set('person', e.target.value)} placeholder="Name" />
               <datalist id="o-people">{people.map(p => <option key={p.name} value={p.name} />)}</datalist>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
               <div>
                 <label className="label" htmlFor="o-amount">Amount</label>
                 <input id="o-amount" className="input num" inputMode="decimal" placeholder="0.00" value={form.amount} onChange={e => set('amount', e.target.value.replace(/[^0-9.]/g, ''))} />

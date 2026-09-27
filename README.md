@@ -15,6 +15,15 @@ A personal finance web app that works on desktop and phone. It's built to be sav
 
 **Not-spending categories:** expense categories marked ⇄ in Settings (e.g. **Investing**) are treated as money moved rather than spent. They appear as a separate *Invested* bar in cash flow but are left out of spending totals, category breakdowns and trends.
 
+## Log transactions from an Apple Shortcut
+
+In **Settings → Apple Shortcut**, create a personal API key. The card shows the two URLs to use and step-by-step instructions for building the shortcut.
+
+- `GET /api/shortcut/options` returns `{ expense: [...], income: [...], accounts: [...] }`, which the shortcut's *Choose from List* step uses.
+- `POST /api/shortcut/transaction` takes JSON `{ amount, title, category, type?, account?, date?, note? }` and replies with a `message` like *Expense saved: $12.50 Coles (Groceries)*.
+
+Send the key as `Authorization: Bearer ldg_…`. Only a hash of the key is stored; you can revoke it or create a new one at any time. If no `date` is sent, it defaults to today in `DEFAULT_TIMEZONE` (default `Australia/Sydney`). If no `account` is sent, your default account from Settings is used.
+
 ## How profit is calculated
 
 Portfolio profit uses the **average-cost method**:

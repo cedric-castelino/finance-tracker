@@ -6,6 +6,7 @@ import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Segmented, Modal, Confirm, Spinner } from '../components/ui';
 import { CATEGORY_ICONS, CategoryIcon } from '../lib/icons';
+import ShortcutSetup from '../components/ShortcutSetup';
 import { api } from '../lib/api';
 import { download } from '../lib/csv';
 import { todayISO } from '../lib/dates';
@@ -109,7 +110,7 @@ export default function Settings() {
   return (
     <>
       <PageHeader eyebrow="Preferences" title="Settings" />
-      <div className="grid gap-4 md:gap-5 xl:grid-cols-2 items-start">
+      <div className="grid gap-4 md:gap-5 xl:grid-cols-2 items-start [&>*]:min-w-0">
         <Card title="Categories" action={<Segmented value={catType} onChange={setCatType} options={[{ value: 'expense', label: 'Expenses' }, { value: 'income', label: 'Income' }]} />}>
           <ul className="divide-y divide-line border border-line rounded-xl overflow-hidden">
             {list.map((c, i) => (
@@ -182,6 +183,8 @@ export default function Settings() {
               ))}
             </div>
           </Card>
+
+          <ShortcutSetup />
 
           <Card title="Investing">
             <label className="flex items-start gap-3 cursor-pointer">
