@@ -335,7 +335,24 @@ async function main() {
         res.status(500).json({ error: "Something went wrong on the server" })
     })
 
-    app.listen(PORT, () => console.log(`Finance Tracker API on http://localhost:${PORT} (storage: ${store.kind})`))
+    app.listen(PORT, () => {
+        console.log(`Finance Tracker API on http://localhost:${PORT} (storage: ${store.kind})`)
+        startKeepAwake()
+    })
+}
+
+// Render's free plan sleeps a service after 15 minutes without inbound traffic, so the first request
+// (e.g. from an Apple Shortcut) waits ~30-60s for a cold start. Pinging our own public URL every
+// 10 minutes counts as inbound traffic and keeps it awake. One always-on service fits within the
+// free plan's 750 instance hours a month. Set KEEP_AWAKE=false to turn it off.
+function startKeepAwake() {
+    const base = process.env.KEEP_AWAKE_URL || process.env.RENDER_EXTERNAL_URL
+    if (!base || process.env.KEEP_AWAKE === "false") return
+    const url = `${base.replace(/\/$/, "")}/api/health`
+    const minutes = Math.max(1, Number(process.env.KEEP_AWAKE_MINUTES) || 10)
+    const ping = () => fetch(url, { signal: AbortSignal.timeout(15000) }).catch(err => console.warn("Keep-awake ping failed:", err.message))
+    setInterval(ping, minutes * 60 * 1000).unref()
+    console.log(`Keep-awake: pinging ${url} every ${minutes} min`)
 }
 
 main().catch(err => {
