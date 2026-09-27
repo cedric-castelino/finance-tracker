@@ -1,12 +1,14 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowPathRoundedSquareIcon, UserPlusIcon, XMarkIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { ArrowPathRoundedSquareIcon, UserPlusIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
 import { useToast } from '../context/ToastContext';
 import { PageHeader, Segmented, Spinner } from '../components/ui';
 import { CategoryIcon } from '../lib/icons';
 import { money } from '../lib/format';
 import { excludedCategories } from '../lib/categories';
+import SplitSection from '../components/SplitSection';
+import { emptySplitRow, splitOwedTotal, validSplits } from '../lib/split';
 import { addDays, relativeDay, todayISO, startOfMonth } from '../lib/dates';
 
 const blank = (type, account = '') => ({ type, amount: '', title: '', category: '', account, date: todayISO(), note: '' });
@@ -21,7 +23,7 @@ export default function AddTransaction() {
   const [form, setForm] = useState(() => blank('expense', defaultAccount('expense')));
   const [showNote, setShowNote] = useState(false);
   const [split, setSplit] = useState(false);
-  const [splitRows, setSplitRows] = useState([{ person: '', amount: '' }]);
+  const [splitRows, setSplitRows] = useState([emptySplitRow()]);
   const [myShareOnly, setMyShareOnly] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -63,7 +65,7 @@ export default function AddTransaction() {
   }, [transactions, excluded]);
 
   const amountNum = parseFloat(form.amount) || 0;
-  const owedTotal = split ? splitRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0;
+  const owedTotal = split ? splitOwedTotal(splitRows) : 0;
   const recorded = split && myShareOnly ? amountNum - owedTotal : amountNum;
 
   const onTitle = value => {
@@ -94,11 +96,7 @@ export default function AddTransaction() {
     amountRef.current?.focus();
   };
 
-  const splitEvenly = () => {
-    const n = splitRows.length + 1; // including me
-    const share = Math.floor((amountNum / n) * 100) / 100;
-    setSplitRows(rows => rows.map(r => ({ ...r, amount: share ? share.toFixed(2) : '' })));
-  };
+
 
   const submit = async e => {
     e.preventDefault();
@@ -106,20 +104,20 @@ export default function AddTransaction() {
     if (!(amountNum > 0)) return setError('Enter an amount greater than $0');
     if (!form.title.trim()) return setError('Add a short description');
     if (!form.category) return setError('Pick a category');
-    const splits = split ? splitRows.filter(r => r.person.trim() && parseFloat(r.amount) > 0) : [];
+    const splits = split ? validSplits(splitRows) : [];
     if (split && myShareOnly && owedTotal >= amountNum) return setError('Amounts owed can’t exceed the total');
 
     setSaving(true);
     try {
-      await add('transactions', { ...form, title: form.title.trim(), amount: Math.round(recorded * 100) / 100 });
+      const saved = await add('transactions', { ...form, title: form.title.trim(), amount: Math.round(recorded * 100) / 100 });
       if (splits.length) {
-        await addMany('debts', splits.map(r => ({ person: r.person.trim(), amount: parseFloat(r.amount), reason: form.title.trim(), date: form.date })));
+        await addMany('debts', splits.map(r => ({ person: r.person.trim(), amount: parseFloat(r.amount), reason: form.title.trim(), date: form.date, transactionId: saved.id })));
       }
       toast(`${form.type === 'expense' ? 'Expense' : 'Income'} of ${money(recorded)} saved${splits.length ? ` · ${splits.length} IOU${splits.length > 1 ? 's' : ''} added` : ''}`);
       categoryTouched.current = false;
       setForm(blank(form.type, defaultAccount(form.type)));
       setSplit(false);
-      setSplitRows([{ person: '', amount: '' }]);
+      setSplitRows([emptySplitRow()]);
       setShowNote(false);
     } catch (err) {
       setError(err.message);
@@ -246,30 +244,15 @@ export default function AddTransaction() {
             )}
 
             {split && (
-              <div className="rounded-2xl border border-gold-500/40 bg-cream-100/60 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="font-semibold text-forest-900 text-sm">Money owed to you</div>
-                  <button type="button" className="btn btn-ghost btn-icon !h-8 !w-8" onClick={() => setSplit(false)} aria-label="Remove split"><XMarkIcon className="h-4 w-4" /></button>
-                </div>
-                {splitRows.map((row, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input className="input flex-1 min-w-0" list="people" placeholder="Name" value={row.person} onChange={e => setSplitRows(rows => rows.map((r, j) => (j === i ? { ...r, person: e.target.value } : r)))} />
-                    <input className="input !w-28 num" inputMode="decimal" placeholder="$0.00" value={row.amount} onChange={e => setSplitRows(rows => rows.map((r, j) => (j === i ? { ...r, amount: e.target.value.replace(/[^0-9.]/g, '') } : r)))} />
-                    {splitRows.length > 1 && (
-                      <button type="button" className="btn btn-ghost btn-icon !h-11" aria-label="Remove person" onClick={() => setSplitRows(rows => rows.filter((_, j) => j !== i))}><XMarkIcon className="h-4 w-4" /></button>
-                    )}
-                  </div>
-                ))}
-                <datalist id="people">{people.map(p => <option key={p} value={p} />)}</datalist>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => setSplitRows(r => [...r, { person: '', amount: '' }])}>+ Person</button>
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={splitEvenly} disabled={!amountNum}>Split evenly</button>
-                </div>
-                <label className="flex items-start gap-2.5 text-sm text-ink-soft cursor-pointer">
-                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-forest-700" checked={myShareOnly} onChange={e => setMyShareOnly(e.target.checked)} />
-                  <span>Only count my share as spending <span className="num font-semibold text-ink">({money(Math.max(recorded, 0))})</span>. The rest is added to Money Owed.</span>
-                </label>
-              </div>
+              <SplitSection
+                rows={splitRows}
+                setRows={setSplitRows}
+                total={amountNum}
+                myShareOnly={myShareOnly}
+                setMyShareOnly={setMyShareOnly}
+                people={people}
+                onRemove={() => setSplit(false)}
+              />
             )}
 
             {error && <div className="rounded-xl bg-loss-bg text-loss text-sm px-3.5 py-2.5">{error}</div>}

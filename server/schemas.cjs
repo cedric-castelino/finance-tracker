@@ -58,6 +58,7 @@ const schemas = {
         date,
         settled: bool,
         settledDate: v => (v ? date(v) : ""),
+        transactionId: str(40), // the expense this IOU was split from, if any
     },
 }
 
