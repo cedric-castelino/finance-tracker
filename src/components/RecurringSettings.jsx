@@ -18,7 +18,9 @@ export default function RecurringSettings() {
     () => [...recurring].sort((a, b) => Number(b.active) - Number(a.active) || a.title.localeCompare(b.title)),
     [recurring]
   );
-  const monthlyOut = recurring.filter(r => r.active && r.type === 'expense').reduce((s, r) => s + monthlyEquivalent(r), 0);
+  const monthlySubs = recurring
+    .filter(r => r.active && r.type === 'expense' && r.category.trim().toLowerCase() === 'subscriptions')
+    .reduce((s, r) => s + monthlyEquivalent(r), 0);
   const iconFor = (type, cat) => (settings?.categories?.[type] || []).find(c => c.name === cat)?.icon;
   const countFor = id => transactions.filter(t => t.recurringId === id).length;
 
@@ -48,7 +50,7 @@ export default function RecurringSettings() {
     >
       <p className="text-sm text-ink-soft mb-4">
         Subscriptions, rent, pay and other regular payments are added to your transactions automatically on each due date.
-        {monthlyOut > 0 && <> About <b className="num text-ink">{money(monthlyOut)}</b> a month goes out on repeat expenses.</>}
+        {monthlySubs > 0 && <> About <b className="num text-ink">{money(monthlySubs)}</b> a month goes on subscriptions.</>}
       </p>
       {items.length === 0 ? (
         <button className="w-full rounded-xl border border-dashed border-cream-300 px-4 py-6 text-sm text-muted hover:border-forest-400 hover:text-forest-700" onClick={() => setEditing('new')}>
