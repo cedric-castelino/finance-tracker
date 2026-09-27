@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Segmented, Modal, Confirm, Spinner } from '../components/ui';
 import { CATEGORY_ICONS, CategoryIcon } from '../lib/icons';
 import ShortcutSetup from '../components/ShortcutSetup';
+import RecurringSettings from '../components/RecurringSettings';
 import { api } from '../lib/api';
 import { download } from '../lib/csv';
 import { todayISO } from '../lib/dates';
@@ -183,6 +184,8 @@ export default function Settings() {
               ))}
             </div>
           </Card>
+
+          <RecurringSettings />
 
           <ShortcutSetup />
 

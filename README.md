@@ -13,6 +13,8 @@ A personal finance web app that works on desktop and phone. It's built to be sav
 | **Net Worth → Money Owed** | IOUs grouped by person. Mark them repaid (with undo) or settle everyone at once. Outstanding totals feed the "+ owed" figures. |
 | **Settings** | Edit categories (rename, reorder, change icons, mark as *not spending*), default accounts for the Add screen, convert US prices to AUD, download or restore a JSON backup, sign out, and delete your account. |
 
+**Repeat transactions:** in Settings, add subscriptions, rent, pay and so on with an amount, name, category, first date and frequency (daily, weekly, fortnightly, monthly or yearly), plus an optional end date. Each time the app loads, the server adds any payments that have come due, dated correctly, so it works even though the free Render server sleeps. Monthly items keep their day of the month; the 31st becomes the 30th in shorter months. You can pause, edit or delete them; deleting stops future payments and keeps past ones.
+
 **Not-spending categories:** expense categories marked ⇄ in Settings (e.g. **Investing**) are treated as money moved rather than spent. They appear as a separate *Invested* bar in cash flow but are left out of spending totals, category breakdowns and trends.
 
 ## Log transactions from an Apple Shortcut

@@ -20,6 +20,7 @@ const schemas = {
         account: str(60),
         date,
         note: str(500),
+        recurringId: str(40), // set when created by a repeat transaction
     },
     trades: {
         side: oneOf(["buy", "sell"], "buy"),
@@ -58,6 +59,19 @@ const schemas = {
         date,
         settled: bool,
         settledDate: v => (v ? date(v) : ""),
+        transactionId: str(40), // the expense this IOU was split from, if any
+    },
+    recurring: {
+        type: oneOf(["expense", "income"], "expense"),
+        amount: v => Math.abs(num(v)),
+        title: str(120),
+        category: str(60),
+        account: str(60),
+        startDate: date,
+        frequency: oneOf(["daily", "weekly", "fortnightly", "monthly", "yearly"], "monthly"),
+        endDate: v => (v ? date(v) : ""),
+        active: v => v !== false && v !== "false",
+        lastDate: v => (v ? date(v) : ""), // last occurrence already added to transactions
     },
 }
 

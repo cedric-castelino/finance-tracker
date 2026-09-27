@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MagnifyingGlassIcon, AdjustmentsHorizontalIcon, ArrowDownTrayIcon, XMarkIcon, ListBulletIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, MagnifyingGlassIcon, AdjustmentsHorizontalIcon, ArrowDownTrayIcon, XMarkIcon, ListBulletIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useData } from '../context/DataContext';
 import { PageHeader, Segmented, Empty } from '../components/ui';
 import TransactionEditor from '../components/TransactionEditor';
@@ -232,6 +232,7 @@ export default function Transactions() {
                             <span className="flex items-center gap-2 min-w-0">
                               <span className="font-semibold text-ink truncate">{t.title}</span>
                               {t.type === 'expense' && excluded.has(t.category) && <span className="badge bg-cream-200 text-gold-600 shrink-0">Not spending</span>}
+                              {t.recurringId && <span className="badge badge-neutral shrink-0" title="Added by a repeat transaction"><ArrowPathIcon className="h-3 w-3" />Repeat</span>}
                             </span>
                             <span className="block text-[13px] text-muted truncate">
                               {t.category}{t.account ? ` · ${t.account}` : ''}{!byDate ? ` · ${relativeDay(t.date)}` : ''}{t.note ? ` · ${t.note}` : ''}
