@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { CameraIcon, Cog6ToothIcon, TrashIcon, PlusIcon, ArrowRightIcon, BuildingLibraryIcon } from '@heroicons/react/24/outline';
+import { CameraIcon, Cog6ToothIcon, TrashIcon, PlusIcon, ArrowRightIcon, BuildingLibraryIcon, CheckIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../context/ToastContext';
 import { PageHeader, SubNav, Stat, Card, Empty, ChartTooltip, Modal, Confirm, Spinner, Delta, Segmented } from '../../components/ui';
 import { money, moneyCompact, toneClass } from '../../lib/format';
 import { addMonths, formatDate, todayISO } from '../../lib/dates';
-import { computeNetWorth } from '../../lib/networth';
+import { computeNetWorth, suggestBalances } from '../../lib/networth';
 import { SERIES, CHART } from '../../lib/colors';
 import { NETWORTH_NAV } from '../../lib/nav';
 
@@ -44,7 +44,7 @@ function balanceFromInput(a, raw) {
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
 
 export default function NetWorth() {
-  const { settings, snapshots, portfolio, owedTotal, saveSettings, add, remove } = useData();
+  const { settings, snapshots, transactions, debts, portfolio, owedTotal, saveSettings, add, remove } = useData();
   const toast = useToast();
   const savedAccounts = useMemo(() => settings?.accounts || [], [settings?.accounts]);
   // Cash/asset inputs hold the balance; credit card inputs hold the *available* amount,
@@ -72,6 +72,7 @@ export default function NetWorth() {
 
   const sortedSnaps = useMemo(() => [...snapshots].sort((a, b) => a.date.localeCompare(b.date) || String(a.createdAt).localeCompare(String(b.createdAt))), [snapshots]);
   const last = sortedSnaps[sortedSnaps.length - 1];
+  const suggestions = useMemo(() => suggestBalances(last, savedAccounts, transactions, debts), [last, savedAccounts, transactions, debts]);
 
   const chartData = useMemo(() => {
     const from = range === 'all' ? '0000' : addMonths(todayISO(), -Number(range));
@@ -117,6 +118,39 @@ export default function NetWorth() {
     const d = since(key);
     if (d == null) return 'No snapshots yet';
     return <span><span className={`num font-semibold ${toneClass(d)}`}>{money(d, { sign: true })}</span> <span className="text-muted">since {formatDate(last.date, { year: false })}</span></span>;
+  };
+
+  // Suggested value in the same terms as the input box (available amount for credit cards).
+  const suggestedInput = a => {
+    const sg = suggestions?.byId[a.id];
+    if (!sg) return null;
+    if (a.type === 'credit') return a.limit > 0 ? round2(a.limit - sg.balance) : null;
+    return sg.balance;
+  };
+
+  const suggestionLine = a => {
+    const sug = suggestedInput(a);
+    if (sug == null) return null;
+    const { count } = suggestions.byId[a.id];
+    const actual = parseFloat(draft[a.id]);
+    const diff = Number.isNaN(actual) ? null : round2(actual - sug);
+    return (
+      <div className="flex items-center justify-between gap-2 mt-1 text-xs">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 min-w-0 rounded-md px-1.5 py-0.5 -ml-1.5 text-forest-700 hover:bg-forest-100"
+          title={`${count} transaction${count === 1 ? '' : 's'} since your ${formatDate(suggestions.since)} snapshot`}
+          aria-label={`Use suggested ${a.type === 'credit' ? 'available balance' : 'balance'} ${money(sug)} for ${a.name}`}
+          onClick={() => { touched.current.add(a.id); setDraft(d => ({ ...d, [a.id]: String(sug) })); }}
+        >
+          <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Suggested <b className="num">{money(sug)}</b>{count > 0 && <span className="text-muted font-normal"> · {count} txn{count === 1 ? '' : 's'}</span>}</span>
+        </button>
+        {diff != null && (Math.abs(diff) < 0.005
+          ? <span className="inline-flex items-center gap-1 text-gain shrink-0"><CheckIcon className="h-3.5 w-3.5" />Matches</span>
+          : <span className="num font-semibold text-gold-600 shrink-0">{money(diff, { sign: true })} vs suggested</span>)}
+      </div>
+    );
   };
 
   const banks = accounts.filter(a => a.type === 'bank');
@@ -165,15 +199,24 @@ export default function NetWorth() {
           action={<button className="btn btn-ghost btn-sm" onClick={() => setManaging(true)}><Cog6ToothIcon className="h-4 w-4" /> Accounts</button>}
         >
           <div className="space-y-5">
+            <p className="text-xs text-muted -mt-1">
+              {suggestions
+                ? <>Suggestions start from your <b className="text-ink-soft">{formatDate(suggestions.since)}</b> snapshot and add the transactions logged to each account since. Tap one to use it.</>
+                : <>Save a snapshot and next time you’ll see a suggested balance for each account, based on the transactions you’ve logged since.</>}
+              {suggestions?.unassigned > 0 && <span className="block mt-1 text-gold-600">{suggestions.unassigned} transaction{suggestions.unassigned === 1 ? '' : 's'} since then {suggestions.unassigned === 1 ? 'has' : 'have'} no account, so {suggestions.unassigned === 1 ? 'it isn’t' : 'they aren’t'} included.</span>}
+            </p>
             <section>
               <div className="flex justify-between text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">
                 <span>Cash accounts</span><span className="num">{money(nw.cash)}</span>
               </div>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {banks.map(a => (
-                  <li key={a.id} className="flex items-center gap-3">
-                    <span className="flex-1 min-w-0 truncate text-sm font-medium">{a.name}</span>
-                    {balanceInput(a)}
+                  <li key={a.id}>
+                    <div className="flex items-center gap-3">
+                      <span className="flex-1 min-w-0 truncate text-sm font-medium">{a.name}</span>
+                      {balanceInput(a)}
+                    </div>
+                    {suggestionLine(a)}
                   </li>
                 ))}
                 {!banks.length && <li className="text-sm text-muted">No cash accounts — add one under Accounts.</li>}
@@ -189,11 +232,14 @@ export default function NetWorth() {
                 <span className="flex items-center gap-1.5 num font-semibold">{money(investments)} <ArrowRightIcon className="h-3.5 w-3.5 text-muted" /></span>
               </Link>
               {others.length > 0 && (
-                <ul className="space-y-2 mt-2">
+                <ul className="space-y-3 mt-2">
                   {others.map(a => (
-                    <li key={a.id} className="flex items-center gap-3">
-                      <span className="flex-1 min-w-0 truncate text-sm font-medium">{a.name} <span className="text-muted font-normal">· non-liquid</span></span>
-                      {balanceInput(a)}
+                    <li key={a.id}>
+                      <div className="flex items-center gap-3">
+                        <span className="flex-1 min-w-0 truncate text-sm font-medium">{a.name} <span className="text-muted font-normal">· non-liquid</span></span>
+                        {balanceInput(a)}
+                      </div>
+                      {suggestionLine(a)}
                     </li>
                   ))}
                 </ul>
@@ -206,7 +252,8 @@ export default function NetWorth() {
               </div>
               <ul className="space-y-2.5">
                 {credits.map(a => (
-                  <li key={a.id} className="flex items-center gap-3">
+                  <li key={a.id}>
+                    <div className="flex items-center gap-3">
                     <span className="flex-1 min-w-0">
                       <span className="block truncate text-sm font-medium">{a.name}</span>
                       {a.limit > 0 ? (
@@ -225,6 +272,8 @@ export default function NetWorth() {
                     ) : (
                       <div className="w-36 shrink-0 text-right text-sm text-muted">—</div>
                     )}
+                    </div>
+                    {suggestionLine(a)}
                   </li>
                 ))}
                 {!credits.length && <li className="text-sm text-muted">No credit cards.</li>}
