@@ -16,9 +16,17 @@ export function colorMap(names) {
   return map;
 }
 
+// Finance mood from the design system. Used for single-series and highlighted series
+// (bars, the current month, portfolio value); categorical charts keep SERIES above.
+export const FINANCE = { deep: '#1f4d3a', mid: '#4f8a6c', soft: '#e4efe7' };
+
+// Wave tones for shapes drawn on a finance-deep surface (quieter steps of the same family).
+export const ON_DEEP = ['#2a5f48', '#3a7358', '#4f8a6c'];
+
 export const CHART = {
-  grid: '#ece3cf',
-  axis: '#7a8079',
-  text: '#4a5550',
-  surface: '#fffdf8',
+  grid: '#eee6d6',
+  axis: '#766c5e',
+  text: '#5f5649',
+  surface: '#ffffff',
+  muted: '#a39e90',
 };

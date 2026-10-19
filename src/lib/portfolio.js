@@ -188,3 +188,41 @@ export function buildValueHistory(trades, history, positions, prices, preference
 
 const sum = (arr, key) => arr.reduce((s, x) => s + (x[key] || 0), 0);
 const round = v => Math.round(v * 100) / 100;
+
+// Last close on or before `date` from a history series ([[iso, close], ...] ascending).
+export function closeOnOrBefore(points = [], date) {
+  let found = null;
+  for (const [d, c] of points) {
+    if (d > date) break;
+    found = c;
+  }
+  return found;
+}
+
+// Net movement of one holding since `startDate`: value now − value at the start − money put in
+// (buys) + money taken out (sells) during the period, so new purchases don't count as gains.
+// `startPrice` is the price (in AUD) at the close of `startDate`; null if unknown.
+export function periodMovement(position, trades, startDate, startPrice) {
+  const own = sortTrades(trades.filter(t => t.ticker === position.ticker));
+  let sharesAtStart = 0;
+  let netIn = 0;
+  let boughtInPeriod = 0;
+  for (const t of own) {
+    if (t.date <= startDate) {
+      sharesAtStart += t.side === 'buy' ? t.quantity : -t.quantity;
+    } else if (t.side === 'buy') {
+      const cost = t.price * t.quantity + t.brokerage;
+      netIn += cost;
+      boughtInPeriod += cost;
+    } else {
+      netIn -= t.price * t.quantity - t.brokerage;
+    }
+  }
+  sharesAtStart = Math.max(0, sharesAtStart);
+  if (sharesAtStart > 1e-9 && !(startPrice > 0)) return null; // held at the start but no price for then
+  if (!position.hasPrice) return null;
+  const valueThen = sharesAtStart * (startPrice || 0);
+  const change = position.value - valueThen - netIn;
+  const base = valueThen + boughtInPeriod;
+  return { change, base, pct: base > 0 ? change / base : 0 };
+}

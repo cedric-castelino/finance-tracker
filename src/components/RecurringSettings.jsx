@@ -63,7 +63,7 @@ export default function RecurringSettings() {
             const next = r.active ? nextOccurrence(r) : null;
             return (
               <li key={r.id} className={`flex items-center gap-3 px-3 py-2.5 bg-white ${r.active ? '' : 'opacity-60'}`}>
-                <span className={`h-9 w-9 rounded-lg grid place-items-center shrink-0 ${r.type === 'income' ? 'bg-gain-bg text-gain' : 'bg-forest-100 text-forest-700'}`}>
+                <span className={`h-9 w-9 rounded-full grid place-items-center shrink-0 ${r.type === 'income' ? 'bg-gain-bg text-gain' : 'bg-forest-100 text-forest-700'}`}>
                   <CategoryIcon icon={iconFor(r.type, r.category)} className="h-[18px] w-[18px]" />
                 </span>
                 <div className="flex-1 min-w-0">

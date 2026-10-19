@@ -7,6 +7,8 @@ import { PageHeader, Segmented, Spinner } from '../components/ui';
 import { CategoryIcon } from '../lib/icons';
 import { money } from '../lib/format';
 import { excludedCategories } from '../lib/categories';
+import { Waves } from '../components/Decor';
+import { ON_DEEP } from '../lib/colors';
 import SplitSection from '../components/SplitSection';
 import { emptySplitRow, splitOwedTotal, validSplits } from '../lib/split';
 import { addDays, relativeDay, todayISO, startOfMonth } from '../lib/dates';
@@ -134,21 +136,23 @@ export default function AddTransaction() {
       <PageHeader eyebrow="Record" title="New transaction" subtitle="Log spending and income in a few taps." />
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
         <form onSubmit={submit} className="card overflow-hidden">
-          <div className={`px-4 md:px-6 pt-5 pb-6 transition-colors ${isExpense ? 'bg-forest-900' : 'bg-forest-700'}`}>
+          <div className={`relative overflow-hidden px-4 md:px-6 pt-5 pb-6 transition-colors ${isExpense ? 'bg-forest-800' : 'bg-forest-700'}`}>
+            <Waves corner="br" tones={ON_DEEP} className="w-24 h-12 md:w-56 md:h-28" />
+            <Waves corner="bl" tones={ON_DEEP} className="hidden md:block w-40 h-20 opacity-70" />
             <Segmented
               value={form.type}
               onChange={switchType}
               size="lg"
-              className="w-full !bg-white/10 !border-white/10 [&>button]:!text-cream-100 [&>button[aria-pressed=true]]:!text-forest-900"
+              className="relative w-full !bg-white/10 !border-white/15 [&>button]:!text-white/85 [&>button[aria-pressed=true]]:!bg-white [&>button[aria-pressed=true]]:!text-forest-800"
               options={[{ value: 'expense', label: 'Expense' }, { value: 'income', label: 'Income' }]}
             />
-            <label htmlFor="amount" className="block text-center text-[12px] uppercase tracking-[0.14em] text-cream-200/70 mt-6">Amount</label>
-            <div className="flex items-center justify-center mt-1">
-              <span className="text-4xl md:text-5xl font-semibold text-gold-500 mr-1">$</span>
+            <label htmlFor="amount" className="relative block text-center text-[12px] font-bold uppercase tracking-[0.12em] text-white/75 mt-6">Amount</label>
+            <div className="relative flex items-center justify-center mt-1">
+              <span className="text-4xl md:text-5xl font-semibold text-forest-300 mr-1">$</span>
               <input
                 id="amount"
                 ref={amountRef}
-                className="num bg-transparent text-cream-50 font-semibold tracking-tight outline-none max-w-[260px] placeholder:text-cream-50/30 !text-[44px] md:!text-[56px]"
+                className="num bg-transparent text-white font-semibold tracking-tight outline-none max-w-[260px] placeholder:text-white/35 !text-[44px] md:!text-[56px]"
                 style={{ width: `${Math.max(4, form.amount.length || 4) * 0.62 + 0.3}em` }}
                 inputMode="decimal"
                 enterKeyHint="next"
@@ -190,10 +194,10 @@ export default function AddTransaction() {
                       onClick={() => { categoryTouched.current = true; set('category', c.name); }}
                       aria-pressed={active}
                       className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-3 text-[12px] font-semibold transition active:scale-[0.97] ${
-                        active ? 'border-forest-800 bg-forest-800 text-cream-50 shadow' : 'border-line bg-white text-ink-soft hover:border-forest-400'
+                        active ? 'border-forest-800 bg-forest-800 text-white' : 'border-line bg-white text-ink-soft hover:border-forest-500 hover:bg-forest-50'
                       }`}
                     >
-                      <CategoryIcon icon={c.icon} className={`h-5 w-5 ${active ? 'text-gold-500' : 'text-forest-600'}`} />
+                      <CategoryIcon icon={c.icon} className={`h-5 w-5 ${active ? 'text-forest-200' : 'text-forest-600'}`} />
                       <span className="truncate max-w-full">{c.name}</span>
                     </button>
                   );
@@ -268,7 +272,7 @@ export default function AddTransaction() {
           <div className="grid grid-cols-2 gap-3">
             <div className="card card-pad">
               <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">Spent this month</div>
-              <div className="num text-xl font-semibold text-forest-900 mt-1.5">{money(monthStats.spent)}</div>
+              <div className="num text-xl font-semibold text-forest-800 mt-1.5">{money(monthStats.spent)}</div>
             </div>
             <div className="card card-pad">
               <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">Earned this month</div>
@@ -289,7 +293,7 @@ export default function AddTransaction() {
                   return (
                     <li key={t.id}>
                       <button type="button" onClick={() => reuse(t)} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-cream-100 group">
-                        <span className="h-9 w-9 rounded-xl bg-forest-100 text-forest-700 grid place-items-center shrink-0">
+                        <span className="h-9 w-9 rounded-full bg-forest-100 text-forest-800 grid place-items-center shrink-0">
                           <CategoryIcon icon={cat?.icon} className="h-[18px] w-[18px]" />
                         </span>
                         <span className="min-w-0 flex-1">

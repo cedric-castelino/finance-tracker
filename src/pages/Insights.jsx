@@ -10,7 +10,8 @@ import { money, moneyCompact, pct, toneClass } from '../lib/format';
 import {
   addDays, addMonths, daysBetween, endOfMonth, formatDate, monthKey, monthLabel, monthsBetween, startOfMonth, todayISO, weekdayIndex, WEEKDAYS, parseISO,
 } from '../lib/dates';
-import { SERIES, OTHER, INCOME, EXPENSE, CHART } from '../lib/colors';
+import { SERIES, OTHER, INCOME, EXPENSE, CHART, FINANCE } from '../lib/colors';
+import { Waves } from '../components/Decor';
 import { excludedCategories, kindOf } from '../lib/categories';
 
 const RANGES = [
@@ -45,6 +46,7 @@ export default function Insights() {
   const isSpend = t => t.type === 'expense' && !excluded.has(t.category);
   const [range, setRange] = useState('6m');
   const [focusCat, setFocusCat] = useState(null);
+  const [hoverCat, setHoverCat] = useState(null);
 
   const earliest = useMemo(() => transactions.reduce((m, t) => (t.date < m ? t.date : m), todayISO()), [transactions]);
   const [from, to] = rangeFor(range, earliest);
@@ -177,14 +179,30 @@ export default function Insights() {
     });
     const today = parseISO(t).getDate();
     const lastDays = parseISO(lastEnd).getDate();
+    const thisDays = parseISO(endOfMonth(t)).getDate();
+    // Month-to-date total so far, and the daily average it implies.
+    const soFar = cumThis.slice(0, today).reduce((x, y) => x + y, 0);
+    const dailyAvg = soFar / today;
+    const projectedTotal = dailyAvg * thisDays;
     let a = 0, b = 0;
     const rows = [];
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < Math.max(thisDays, lastDays); i++) {
       a += cumThis[i];
       b += cumLast[i];
-      rows.push({ day: i + 1, 'This month': i < today ? a : null, 'Last month': i < lastDays ? b : null });
+      const day = i + 1;
+      rows.push({
+        day,
+        'This month': day <= today ? a : null,
+        // Straight line at the month-to-date daily average, from today to the end of the month.
+        Projected: day >= today && day <= thisDays && today < thisDays ? soFar + dailyAvg * (day - today) : null,
+        'Last month': day <= lastDays ? b : null,
+      });
     }
-    return { rows, thisTotal: a, lastSameDay: rows[today - 1]?.['Last month'] ?? b, lastTotal: b, thisLabel: monthLabel(monthKey(thisStart)), lastLabel: monthLabel(monthKey(lastStart)) };
+    return {
+      rows, thisTotal: soFar, dailyAvg, projectedTotal, daysLeft: thisDays - today,
+      lastSameDay: rows[today - 1]?.['Last month'] ?? b, lastTotal: b,
+      thisLabel: monthLabel(monthKey(thisStart)), lastLabel: monthLabel(monthKey(lastStart)),
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions, focusCat, excluded]);
 
@@ -251,7 +269,7 @@ export default function Insights() {
                 <ReferenceLine y={0} stroke={CHART.axis} />
                 <Tooltip cursor={{ fill: 'rgba(26,77,57,0.06)' }} content={<ChartTooltip labelFormatter={bucketLabel} valueFormatter={v => money(v, { sign: true })} />} />
                 <Bar dataKey="net" name="Net" radius={[4, 4, 4, 4]} maxBarSize={28}>
-                  {stats.flow.map(r => <Cell key={r.key} fill={r.net >= 0 ? '#1f7a4d' : '#b3413a'} />)}
+                  {stats.flow.map(r => <Cell key={r.key} fill={r.net >= 0 ? FINANCE.mid : '#b3413a'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -269,16 +287,29 @@ export default function Insights() {
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie data={stats.donut} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="92%" stroke={CHART.surface} strokeWidth={2} isAnimationActive={false}
+                      onMouseEnter={d => setHoverCat(d.name)} onMouseLeave={() => setHoverCat(null)}
                       onClick={d => setFocusCat(f => (f === d.name || d.name === 'Other' ? null : d.name))}>
-                      {stats.donut.map(d => <Cell key={d.name} fill={colorOf(d.name)} opacity={focusCat && focusCat !== d.name ? 0.3 : 1} className="cursor-pointer" />)}
+                      {stats.donut.map(d => {
+                        const active = hoverCat || focusCat;
+                        return <Cell key={d.name} fill={colorOf(d.name)} opacity={active && active !== d.name ? 0.3 : 1} className="cursor-pointer" />;
+                      })}
                     </Pie>
-                    <Tooltip content={<ChartTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 grid place-items-center pointer-events-none">
                   <div className="text-center">
-                    <div className="text-[11px] uppercase tracking-[0.1em] text-muted font-semibold">{focusCat || 'Total'}</div>
-                    <div className="num text-base md:text-lg font-semibold text-forest-900">{money(focusCat ? stats.categories.find(c => c.name === focusCat)?.value : a.expense)}</div>
+                    {(() => {
+                      // Hovered (or focused) category shows in the centre instead of a floating tooltip.
+                      const name = hoverCat || focusCat;
+                      const value = name ? (stats.donut.find(d => d.name === name)?.value ?? stats.categories.find(c => c.name === name)?.value ?? 0) : a.expense;
+                      return (
+                        <div className="max-w-[120px]">
+                          <div className="text-[11px] uppercase tracking-[0.1em] text-forest-800 font-bold truncate">{name || 'Total'}</div>
+                          <div className="num text-base md:text-lg font-semibold text-forest-800">{money(value)}</div>
+                          {name && a.expense > 0 && <div className="num text-xs text-ink-soft">{pct(value / a.expense, { digits: 1 })}</div>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -334,7 +365,21 @@ export default function Insights() {
             )}
           </Card>
 
-          <Card title={`Spending pace${focusCat ? ` · ${focusCat}` : ''}`} action={<Legend items={[{ label: pace.thisLabel, color: SERIES[0], line: true }, { label: pace.lastLabel, color: OTHER, line: true }]} />}>
+          <Card title={`Spending pace${focusCat ? ` · ${focusCat}` : ''}`} action={<Legend items={[{ label: pace.thisLabel, color: FINANCE.deep, line: true }, { label: 'Projected', color: FINANCE.mid, line: true }, { label: pace.lastLabel, color: CHART.muted, line: true }]} />}>
+            {pace.daysLeft > 0 && (
+              <div className="relative overflow-hidden rounded-[14px] bg-forest-100 border border-forest-200 px-4 py-3 mb-3">
+                <Waves corner="br" tones={[FINANCE.soft, '#cde0d4', '#a3c6b2']} className="w-28 h-full opacity-90" />
+                <div className="relative text-[12px] font-bold uppercase tracking-[0.12em] text-forest-800">Projected this month</div>
+                <div className="relative flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-0.5 pr-20">
+                  <span className="num text-2xl font-semibold text-forest-800">{money(pace.projectedTotal)}</span>
+                  {pace.lastTotal > 0 && (() => {
+                    const d = (pace.projectedTotal - pace.lastTotal) / pace.lastTotal;
+                    return <span className={`num text-sm font-semibold ${d > 0 ? 'text-loss' : 'text-gain'}`}>{d > 0 ? '▲' : '▼'} {pct(Math.abs(d), { digits: 0 })} vs {pace.lastLabel}</span>;
+                  })()}
+                </div>
+                <div className="relative text-[13px] text-ink-soft mt-0.5 pr-20">At your average of <b className="num text-ink">{money(pace.dailyAvg)}</b>/day so far, with {pace.daysLeft} day{pace.daysLeft === 1 ? '' : 's'} to go.</div>
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm mb-3">
               <span className="text-ink-soft">This month so far <b className="num text-ink">{money(pace.thisTotal)}</b></span>
               <span className="text-ink-soft">Same point last month <b className="num text-ink">{money(pace.lastSameDay)}</b></span>
@@ -347,8 +392,9 @@ export default function Insights() {
                   <XAxis dataKey="day" {...axisProps} interval={4} />
                   <YAxis tickFormatter={moneyCompact} {...axisProps} width={56} />
                   <Tooltip content={<ChartTooltip labelFormatter={d => `Day ${d}`} />} />
-                  <Line type="monotone" dataKey="Last month" stroke={OTHER} strokeWidth={2} strokeDasharray="4 4" dot={false} connectNulls={false} />
-                  <Line type="monotone" dataKey="This month" stroke={SERIES[0]} strokeWidth={2.5} dot={false} connectNulls={false} activeDot={{ r: 5, stroke: CHART.surface, strokeWidth: 2 }} />
+                  <Line type="monotone" dataKey="Last month" stroke={CHART.muted} strokeWidth={2} strokeDasharray="2 4" dot={false} connectNulls={false} />
+                  <Line type="linear" dataKey="Projected" stroke={FINANCE.mid} strokeWidth={2} strokeDasharray="6 4" dot={false} connectNulls={false} activeDot={{ r: 4, stroke: CHART.surface, strokeWidth: 2 }} />
+                  <Line type="monotone" dataKey="This month" stroke={FINANCE.deep} strokeWidth={2.5} dot={false} connectNulls={false} activeDot={{ r: 5, stroke: CHART.surface, strokeWidth: 2 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -365,7 +411,7 @@ export default function Insights() {
                 <XAxis dataKey="day" {...axisProps} />
                 <YAxis tickFormatter={moneyCompact} {...axisProps} width={48} />
                 <Tooltip cursor={{ fill: 'rgba(26,77,57,0.06)' }} content={<ChartTooltip valueFormatter={v => `${money(v)} / wk`} />} />
-                <Bar dataKey="avg" name="Avg spend" fill={SERIES[0]} radius={[4, 4, 0, 0]} maxBarSize={32} />
+                <Bar dataKey="avg" name="Avg spend" fill={FINANCE.mid} radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>

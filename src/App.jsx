@@ -31,7 +31,7 @@ function DataGate() {
     return (
       <div className="min-h-dvh grid place-items-center p-6 text-center">
         <div>
-          <p className="font-semibold text-forest-900">Couldn’t load your data</p>
+          <p className="font-semibold text-forest-800">Couldn’t load your data</p>
           <p className="text-sm text-ink-soft mt-1">{error}</p>
           <button className="btn btn-primary mt-4" onClick={reload}>Try again</button>
         </div>

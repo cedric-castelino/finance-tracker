@@ -16,9 +16,9 @@ export default function SplitSection({ rows, setRows, total, myShareOnly, setMyS
   const setRow = (i, k, v) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
 
   return (
-    <div className="rounded-2xl border border-gold-500/40 bg-cream-100/60 p-4 space-y-3">
+    <div className="rounded-[14px] border border-forest-200 bg-forest-100/70 p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <div className="font-semibold text-forest-900 text-sm">Money owed to you</div>
+        <div className="font-semibold text-forest-800 text-sm">Money owed to you</div>
         <button type="button" className="btn btn-ghost btn-icon !h-8 !w-8" onClick={onRemove} aria-label="Remove split"><XMarkIcon className="h-4 w-4" /></button>
       </div>
       {rows.map((row, i) => (

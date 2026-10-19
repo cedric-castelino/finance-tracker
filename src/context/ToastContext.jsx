@@ -18,13 +18,13 @@ export function ToastProvider({ children }) {
       {children}
       <div className="fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4 pointer-events-none bottom-[calc(96px+env(safe-area-inset-bottom))] lg:bottom-6">
         {toasts.map(t => (
-          <div key={t.id} role="status" className="animate-toast pointer-events-auto flex items-center gap-3 rounded-xl bg-forest-900 text-cream-50 pl-3.5 pr-2 py-2.5 shadow-lg max-w-md w-full sm:w-auto">
+          <div key={t.id} role="status" className="animate-toast pointer-events-auto flex items-center gap-3 rounded-full bg-forest-800 text-white pl-4 pr-2 py-2.5 max-w-md w-full sm:w-auto">
             {t.tone === 'error'
-              ? <ExclamationTriangleIcon className="h-5 w-5 text-gold-500 shrink-0" />
+              ? <ExclamationTriangleIcon className="h-5 w-5 text-forest-200 shrink-0" />
               : <CheckCircleIcon className="h-5 w-5 text-forest-300 shrink-0" />}
             <span className="text-sm font-medium flex-1 pr-2">{t.message}</span>
             {t.action && (
-              <button className="text-sm font-semibold text-gold-500 px-2 py-1 rounded-md hover:bg-white/10" onClick={() => { t.action.onClick(); setToasts(x => x.filter(y => y.id !== t.id)); }}>
+              <button className="text-sm font-semibold text-forest-100 underline underline-offset-2 px-2 py-1 rounded-full hover:bg-white/10" onClick={() => { t.action.onClick(); setToasts(x => x.filter(y => y.id !== t.id)); }}>
                 {t.action.label}
               </button>
             )}

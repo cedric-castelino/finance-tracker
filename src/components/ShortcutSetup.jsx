@@ -83,9 +83,9 @@ export default function ShortcutSetup() {
       </p>
 
       {newKey ? (
-        <div className="rounded-xl border border-gold-500/50 bg-cream-100 p-3.5 mb-4 space-y-2">
+        <div className="rounded-[14px] border border-forest-200 bg-forest-100 p-3.5 mb-4 space-y-2">
           <CopyField label="Your API key" value={newKey} />
-          <p className="text-xs text-gold-600 font-medium">Copy it now — for security it won’t be shown again.</p>
+          <p className="text-xs text-forest-800 font-semibold">Copy it now — for security it won’t be shown again.</p>
         </div>
       ) : user.apiKey ? (
         <div className="flex items-center gap-3 rounded-xl border border-line bg-white px-3.5 py-3 mb-4">
@@ -111,7 +111,7 @@ export default function ShortcutSetup() {
       </div>
 
       <details className="group rounded-xl border border-line bg-white">
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-forest-900 list-none flex items-center justify-between">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-forest-800 list-none flex items-center justify-between">
           How to build the shortcut
           <span className="text-muted transition group-open:rotate-180">▾</span>
         </summary>

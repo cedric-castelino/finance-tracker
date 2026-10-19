@@ -2,12 +2,19 @@ import { useEffect, useId } from 'react';
 import { NavLink } from 'react-router-dom';
 import { XMarkIcon, ArrowUpRightIcon, ArrowDownRightIcon } from '@heroicons/react/24/outline';
 import { money, pct } from '../lib/format';
+import { Waves, Dots } from './Decor';
+import { ON_DEEP } from '../lib/colors';
 
 export function PageHeader({ eyebrow, title, subtitle, actions }) {
   return (
-    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5 md:mb-7">
-      <div>
-        {eyebrow && <div className="text-[12px] font-semibold uppercase tracking-[0.14em] text-gold-600 mb-1">{eyebrow}</div>}
+    <div className="relative flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-5 md:mb-7">
+      <div className="pr-28 md:pr-0">
+        {eyebrow && (
+          <div className="flex items-center gap-2.5 mb-1">
+            <span className="text-[12px] font-bold uppercase tracking-[0.12em] text-forest-800">{eyebrow}</span>
+            <Dots count={3} className="opacity-90" />
+          </div>
+        )}
         <h1 className="page-title">{title}</h1>
         {subtitle && <p className="text-ink-soft mt-1 text-[15px]">{subtitle}</p>}
       </div>
@@ -25,8 +32,8 @@ export function SubNav({ items }) {
           to={item.to}
           end={item.end}
           className={({ isActive }) =>
-            `flex-1 sm:flex-none text-center h-9 px-4 leading-9 rounded-lg text-sm font-semibold transition whitespace-nowrap ${
-              isActive ? 'bg-white text-forest-900 shadow-sm' : 'text-ink-soft hover:text-forest-900'
+            `flex-1 sm:flex-none text-center h-9 px-5 leading-9 rounded-full text-sm font-semibold transition whitespace-nowrap ${
+              isActive ? 'bg-forest-800 text-white' : 'text-ink-soft hover:text-forest-800'
             }`
           }
         >
@@ -57,13 +64,14 @@ export function Segmented({ value, onChange, options, className = '', size }) {
 
 export function Stat({ label, value, sub, tone, icon: Icon, emphasis = false, className = '' }) {
   return (
-    <div className={`card card-pad ${emphasis ? '!bg-forest-900 !border-forest-900 text-cream-50' : ''} ${className}`}>
-      <div className="flex items-center justify-between gap-2">
-        <div className={`text-[12px] font-semibold uppercase tracking-[0.08em] ${emphasis ? 'text-cream-200/70' : 'text-muted'}`}>{label}</div>
-        {Icon && <Icon className={`h-5 w-5 ${emphasis ? 'text-gold-500' : 'text-forest-400'}`} />}
+    <div className={`card card-pad relative overflow-hidden ${emphasis ? '!bg-forest-800 !border-forest-800 text-white' : ''} ${className}`}>
+      {emphasis && <Waves corner="br" tones={ON_DEEP} className="w-[46%] h-[58%]" />}
+      <div className="relative flex items-center justify-between gap-2">
+        <div className={`text-[12px] font-bold uppercase tracking-[0.12em] ${emphasis ? 'text-white/75' : 'text-forest-800'}`}>{label}</div>
+        {Icon && <Icon className={`h-5 w-5 ${emphasis ? 'text-forest-200' : 'text-forest-500'}`} />}
       </div>
-      <div className={`num mt-2 text-[22px] md:text-[26px] font-semibold tracking-tight ${emphasis ? 'text-white' : tone || 'text-forest-900'}`}>{value}</div>
-      {sub && <div className={`mt-1 text-[13px] ${emphasis ? 'text-cream-200/70' : 'text-ink-soft'}`}>{sub}</div>}
+      <div className={`relative num mt-2 text-[22px] md:text-[26px] font-semibold tracking-tight ${emphasis ? 'text-white' : tone || 'text-ink'}`}>{value}</div>
+      {sub && <div className={`relative mt-1 text-[13px] ${emphasis ? 'text-white/80' : 'text-ink-soft'}`}>{sub}</div>}
     </div>
   );
 }
@@ -99,11 +107,12 @@ export function Empty({ icon: Icon, title, children, action }) {
   return (
     <div className="flex flex-col items-center text-center py-10 px-6">
       {Icon && (
-        <div className="h-12 w-12 rounded-2xl bg-forest-100 text-forest-700 grid place-items-center mb-3">
+        <div className="h-14 w-14 rounded-full bg-forest-100 text-forest-800 grid place-items-center mb-3">
           <Icon className="h-6 w-6" />
         </div>
       )}
-      <div className="font-semibold text-forest-900">{title}</div>
+      <Dots count={4} className="mb-3" />
+      <div className="font-semibold text-forest-800">{title}</div>
       {children && <p className="text-sm text-ink-soft mt-1 max-w-sm">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
@@ -139,9 +148,9 @@ export function Modal({ open, onClose, title, children, footer, wide = false }) 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-forest-950/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div className={`animate-sheet relative w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[92dvh] flex flex-col bg-card rounded-t-3xl sm:rounded-2xl shadow-2xl`}>
+      <div className={`animate-sheet relative w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'} max-h-[92dvh] flex flex-col bg-card border border-line rounded-t-[22px] sm:rounded-[14px]`}>
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-line">
-          <h3 className="font-serif text-xl font-semibold text-forest-900">{title}</h3>
+          <h3 className="font-serif text-xl font-semibold text-forest-800">{title}</h3>
           <button className="btn btn-ghost btn-icon -mr-2" onClick={onClose} aria-label="Close">
             <XMarkIcon className="h-5 w-5" />
           </button>
@@ -183,8 +192,8 @@ export function Spinner({ className = 'h-5 w-5' }) {
 export function ChartTooltip({ active, payload, label, labelFormatter, valueFormatter = money }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl bg-white border border-line shadow-lg px-3 py-2.5 text-sm min-w-[160px]">
-      {label != null && <div className="font-semibold text-forest-900 mb-1.5">{labelFormatter ? labelFormatter(label) : label}</div>}
+    <div className="rounded-md bg-white border border-line px-3 py-2.5 text-sm min-w-[160px]">
+      {label != null && <div className="font-semibold text-forest-800 mb-1.5">{labelFormatter ? labelFormatter(label) : label}</div>}
       {payload.map(p => (
         <div key={p.dataKey || p.name} className="flex items-center justify-between gap-4 py-0.5">
           <span className="flex items-center gap-2 text-ink-soft">

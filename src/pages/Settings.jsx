@@ -123,7 +123,7 @@ export default function Settings() {
                   onChange={e => setList(list.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} aria-label="Category name" />
                 {catType === 'expense' && (
                   <button
-                    className={`btn btn-icon ${c.excluded ? 'bg-gold-500/20 text-gold-600 ring-1 ring-gold-500/60' : 'btn-ghost text-muted'}`}
+                    className={`btn btn-icon ${c.excluded ? 'bg-forest-800 text-white hover:bg-forest-700' : 'btn-ghost text-muted'}`}
                     aria-pressed={!!c.excluded}
                     aria-label={`${c.name}: ${c.excluded ? 'not counted as spending' : 'counted as spending'}`}
                     title={c.excluded ? 'Not counted as spending' : 'Counted as spending'}
@@ -145,7 +145,7 @@ export default function Settings() {
           <p className="text-xs text-muted mt-2">Renaming a category doesn’t change existing transactions. The order here is the order on the Add screen.</p>
           {catType === 'expense' && (
             <p className="text-xs text-muted mt-1.5 flex gap-1.5">
-              <ArrowsRightLeftIcon className="h-3.5 w-3.5 text-gold-600 shrink-0 mt-px" />
+              <ArrowsRightLeftIcon className="h-3.5 w-3.5 text-forest-800 shrink-0 mt-px" />
               <span>Highlighted categories (like <b>Investing</b>) are money moved rather than spent: they show in cash flow on Insights but aren’t counted as spending.</span>
             </p>
           )}
@@ -158,7 +158,7 @@ export default function Settings() {
         <div className="space-y-4 md:space-y-5">
           <Card title="Account">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-gold-500 text-forest-950 grid place-items-center text-lg font-semibold">{user.firstName.slice(0, 1).toUpperCase()}</div>
+              <div className="h-12 w-12 rounded-full bg-forest-800 text-white grid place-items-center text-lg font-semibold">{user.firstName.slice(0, 1).toUpperCase()}</div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold">{user.firstName} {user.lastName}</div>
                 <div className="text-sm text-muted truncate">{user.email}</div>
@@ -234,7 +234,7 @@ export default function Settings() {
           <div className="grid grid-cols-6 gap-2">
             {Object.keys(CATEGORY_ICONS).map(k => (
               <button key={k} aria-label={k} onClick={() => { setList(list.map((x, j) => (j === iconFor ? { ...x, icon: k } : x))); setIconFor(null); }}
-                className={`aspect-square rounded-xl grid place-items-center border ${list[iconFor]?.icon === k ? 'border-forest-800 bg-forest-800 text-gold-500' : 'border-line bg-white text-forest-700 hover:border-forest-400'}`}>
+                className={`aspect-square rounded-xl grid place-items-center border ${list[iconFor]?.icon === k ? 'border-forest-800 bg-forest-800 text-forest-100' : 'border-line bg-white text-forest-700 hover:border-forest-400'}`}>
                 <CategoryIcon icon={k} className="h-6 w-6" />
               </button>
             ))}
