@@ -6,13 +6,23 @@ import { useData } from '../../context/DataContext';
 import { useToast } from '../../context/ToastContext';
 import { PageHeader, SubNav, Stat, Card, Empty, ChartTooltip, Segmented, Modal, Spinner, Delta, Legend } from '../../components/ui';
 import { money, moneyCompact, num, pct, toneClass } from '../../lib/format';
-import { formatDate } from '../../lib/dates';
+import { addDays, addMonths, formatDate, todayISO } from '../../lib/dates';
 import { api } from '../../lib/api';
-import { buildValueHistory, quoteSymbol } from '../../lib/portfolio';
-import { SERIES, OTHER, CHART } from '../../lib/colors';
+import { buildValueHistory, closeOnOrBefore, periodMovement, quoteSymbol, toBase } from '../../lib/portfolio';
+import { SERIES, OTHER, CHART, FINANCE } from '../../lib/colors';
 import { INVEST_NAV } from '../../lib/nav';
 
 const STALE_MS = 15 * 60 * 1000;
+
+// Holdings return periods: where each starts, and which history range has a close for that date.
+const MOVE_PERIODS = [
+  { value: '1d', label: '1D', name: 'today', start: t => addDays(t, -1) },
+  { value: '1w', label: '1W', name: 'past week', start: t => addDays(t, -7), range: '3mo' },
+  { value: '1m', label: '1M', name: 'past month', start: t => addMonths(t, -1), range: '3mo' },
+  { value: '1y', label: '1Y', name: 'past year', start: t => addMonths(t, -12), range: '1y' },
+  { value: '5y', label: '5Y', name: 'past 5 years', start: t => addMonths(t, -60), range: '5y' },
+  { value: 'all', label: 'All', name: 'lifetime' },
+];
 
 function timeAgo(iso) {
   if (!iso) return 'never';
@@ -65,6 +75,48 @@ export default function Portfolio() {
     return t => map[t] || OTHER;
   }, [open]);
 
+  const [hoverSlice, setHoverSlice] = useState(null);
+  const [movePeriod, setMovePeriod] = useState('all');
+  const [moveHistory, setMoveHistory] = useState({}); // range -> history response
+  const period = MOVE_PERIODS.find(m => m.value === movePeriod);
+  const openSymbols = useMemo(() => [...new Set(open.map(p => quoteSymbol(p.ticker, p.market)))].sort().join(','), [open]);
+
+  useEffect(() => {
+    const range = period.range;
+    if (!range || !openSymbols || moveHistory[`${range}|${openSymbols}`]) return;
+    let cancelled = false;
+    api(`/market/history?range=${range}&symbols=${encodeURIComponent(openSymbols)}`)
+      .then(h => { if (!cancelled) setMoveHistory(m => ({ ...m, [`${range}|${openSymbols}`]: h })); })
+      .catch(() => { if (!cancelled) setMoveHistory(m => ({ ...m, [`${range}|${openSymbols}`]: {} })); });
+    return () => { cancelled = true; };
+  }, [period, openSymbols, moveHistory]);
+
+  // Net movement of each holding over the selected period (see periodMovement).
+  const movement = useMemo(() => {
+    const out = {};
+    const prices = settings?.prices || {};
+    const prefs = settings?.preferences;
+    const history = period.range ? moveHistory[`${period.range}|${openSymbols}`] : null;
+    const loading = period.range && !history;
+    let change = 0, base = 0, known = 0;
+    for (const p of open) {
+      let m = null;
+      if (period.value === 'all') {
+        m = p.hasPrice ? { change: p.unrealised, base: p.costBasis, pct: p.unrealisedPct } : null;
+      } else if (period.value === '1d') {
+        const q = prices[p.ticker];
+        const prev = q?.prevClose > 0 ? toBase(q.prevClose, q.currency, prices, prefs) : null;
+        m = periodMovement(p, trades, period.start(todayISO()), prev);
+      } else if (history) {
+        const h = history[quoteSymbol(p.ticker, p.market)];
+        const close = h?.points ? closeOnOrBefore(h.points, period.start(todayISO())) : null;
+        m = periodMovement(p, trades, period.start(todayISO()), close != null ? toBase(close, h.currency, prices, prefs) : null);
+      }
+      out[p.ticker] = m;
+      if (m) { change += m.change; base += m.base; known++; }
+    }
+    return { byTicker: out, loading, total: known ? { change, pct: base > 0 ? change / base : 0 } : null };
+  }, [period, open, trades, settings, moveHistory, openSymbols]);
   const allocation = useMemo(() => {
     const named = [];
     let other = 0;
@@ -75,6 +127,7 @@ export default function Portfolio() {
     if (other > 0) named.push({ name: 'Other', ticker: 'Other', value: other });
     return named;
   }, [open, colorOf]);
+  const hovered = hoverSlice ? allocation.find(a => a.ticker === hoverSlice) : null;
 
   if (!trades.length) {
     return (
@@ -114,16 +167,21 @@ export default function Portfolio() {
       </div>
 
       {warnings.length > 0 && (
-        <div className="card border-gold-500/50 bg-cream-100 px-4 py-3 mb-5 flex gap-3 text-sm">
-          <ExclamationTriangleIcon className="h-5 w-5 text-gold-600 shrink-0" />
+        <div className="card !border-forest-200 !bg-forest-100 px-4 py-3 mb-5 flex gap-3 text-sm">
+          <ExclamationTriangleIcon className="h-5 w-5 text-forest-800 shrink-0" />
           <div>
-            <div className="font-semibold text-forest-900">Check these trades</div>
+            <div className="font-semibold text-forest-800">Check these trades</div>
             <ul className="text-ink-soft mt-0.5">{warnings.map(w => <li key={w}>{w}</li>)}</ul>
           </div>
         </div>
       )}
 
-      <Card title="Holdings" className="mb-5" pad={false}>
+      <Card
+        title="Holdings"
+        className="mb-5"
+        pad={false}
+        action={<Segmented value={movePeriod} onChange={setMovePeriod} options={MOVE_PERIODS.map(m => ({ value: m.value, label: m.label }))} className="w-full sm:w-auto [&>button]:flex-1 [&>button]:!px-3" />}
+      >
           {open.length === 0 ? (
             <p className="px-5 py-6 text-sm text-ink-soft">You have no open positions.</p>
           ) : (
@@ -138,7 +196,7 @@ export default function Portfolio() {
                       <th className="text-right">Price</th>
                       <th className="text-right">Cost</th>
                       <th className="text-right">Value</th>
-                      <th className="text-right !pr-5">Profit</th>
+                      <th className="text-right !pr-5">{period.value === 'all' ? 'Profit' : `Return · ${period.label}`}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -166,8 +224,7 @@ export default function Portfolio() {
                         <td className="text-right num">{money(p.costBasis)}</td>
                         <td className="text-right num font-semibold">{money(p.value)}</td>
                         <td className="text-right !pr-5">
-                          <div className={`num font-semibold ${toneClass(p.unrealised)}`}>{money(p.unrealised, { sign: true })}</div>
-                          <span className={`badge num mt-0.5 ${p.unrealised > 0 ? 'badge-gain' : p.unrealised < 0 ? 'badge-loss' : 'badge-neutral'}`}>{pct(p.unrealisedPct, { sign: true })}</span>
+                          <MoveCell m={movement.byTicker[p.ticker]} loading={movement.loading} />
                         </td>
                       </tr>
                     ))}
@@ -178,10 +235,18 @@ export default function Portfolio() {
                       <td /><td /><td />
                       <td className="text-right num px-3">{money(totals.cost)}</td>
                       <td className="text-right num px-3">{money(totals.value)}</td>
-                      <td className={`text-right num !pr-5 px-3 ${toneClass(totals.unrealised)}`}>{money(totals.unrealised, { sign: true })}</td>
+                      <td className={`text-right num !pr-5 px-3 ${toneClass(movement.total?.change || 0)}`}>
+                        {movement.loading ? '…' : movement.total ? <>{money(movement.total.change, { sign: true })} <span className="text-xs font-semibold">({pct(movement.total.pct, { sign: true })})</span></> : '—'}
+                      </td>
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+              <div className="md:hidden flex items-center justify-between px-4 pt-3 text-sm">
+                <span className="text-ink-soft">{period.value === 'all' ? 'Unrealised profit' : `Return · ${period.name}`}</span>
+                <span className={`num font-semibold ${toneClass(movement.total?.change || 0)}`}>
+                  {movement.loading ? '…' : movement.total ? `${money(movement.total.change, { sign: true })} (${pct(movement.total.pct, { sign: true })})` : '—'}
+                </span>
               </div>
               <ul className="md:hidden mt-2">
                 {open.map(p => (
@@ -195,7 +260,12 @@ export default function Portfolio() {
                         </div>
                         <div className="flex justify-between gap-3 text-[13px] text-muted mt-0.5">
                           <span>{p.ticker} · {num(p.shares)} @ {money(p.avgPrice)}</span>
-                          <span className={`num font-semibold ${toneClass(p.unrealised)}`}>{money(p.unrealised, { sign: true })} ({pct(p.unrealisedPct, { sign: true })})</span>
+                          {(() => {
+                            const m = movement.byTicker[p.ticker];
+                            if (movement.loading) return <span>…</span>;
+                            if (!m) return <span>—</span>;
+                            return <span className={`num font-semibold ${toneClass(m.change)}`}>{money(m.change, { sign: true })} ({pct(m.pct, { sign: true })})</span>;
+                          })()}
                         </div>
                         <div className="flex justify-between gap-3 text-[13px] text-muted mt-0.5">
                           <span>Cost {money(p.costBasis)}</span>
@@ -219,22 +289,33 @@ export default function Portfolio() {
               <div className="relative h-[220px]">
                 <ResponsiveContainer>
                   <PieChart>
-                    <Pie data={allocation} dataKey="value" nameKey="name" innerRadius="60%" outerRadius="92%" stroke={CHART.surface} strokeWidth={2} isAnimationActive={false}>
-                      {allocation.map(a => <Cell key={a.ticker} fill={colorOf(a.ticker)} />)}
+                    <Pie data={allocation} dataKey="value" nameKey="name" innerRadius="60%" outerRadius="92%" stroke={CHART.surface} strokeWidth={2} isAnimationActive={false}
+                      onMouseEnter={(_, i) => setHoverSlice(allocation[i]?.ticker)} onMouseLeave={() => setHoverSlice(null)}
+                      onClick={(_, i) => setHoverSlice(t => (t === allocation[i]?.ticker ? null : allocation[i]?.ticker))}>
+                      {allocation.map(a => <Cell key={a.ticker} fill={colorOf(a.ticker)} opacity={hoverSlice && hoverSlice !== a.ticker ? 0.3 : 1} className="cursor-pointer" />)}
                     </Pie>
-                    <Tooltip content={<ChartTooltip />} />
                   </PieChart>
                 </ResponsiveContainer>
+                {/* The hovered slice is described in the centre, so nothing floats over the value. */}
                 <div className="absolute inset-0 grid place-items-center pointer-events-none text-center">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.1em] text-muted font-semibold">Value</div>
-                    <div className="num text-lg font-semibold text-forest-900">{moneyCompact(totals.value)}</div>
-                  </div>
+                  {hovered ? (
+                    <div className="max-w-[46%]">
+                      <div className="text-[11px] uppercase tracking-[0.1em] text-forest-800 font-bold truncate">{hovered.ticker === 'Other' ? 'Other' : hovered.ticker}</div>
+                      <div className="num text-lg font-semibold text-forest-800">{moneyCompact(hovered.value)}</div>
+                      <div className="num text-xs text-ink-soft">{pct(totals.value ? hovered.value / totals.value : 0, { digits: 1 })} of portfolio</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-[0.1em] text-forest-800 font-bold">Value</div>
+                      <div className="num text-lg font-semibold text-forest-800">{moneyCompact(totals.value)}</div>
+                    </div>
+                  )}
                 </div>
               </div>
-              <ul className="mt-4 space-y-2">
+              <ul className="mt-4 space-y-1">
                 {allocation.map(a => (
-                  <li key={a.ticker} className="flex items-center gap-2.5 text-sm">
+                  <li key={a.ticker} onMouseEnter={() => setHoverSlice(a.ticker)} onMouseLeave={() => setHoverSlice(null)}
+                    className={`flex items-center gap-2.5 text-sm rounded-md px-1.5 py-1 -mx-1.5 transition ${hoverSlice === a.ticker ? 'bg-forest-100' : ''}`}>
                     <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: colorOf(a.ticker) }} />
                     <span className="flex-1 truncate text-ink-soft">{a.name}</span>
                     <span className="num font-semibold">{pct(totals.value ? a.value / totals.value : 0, { digits: 1 })}</span>
@@ -292,6 +373,17 @@ export default function Portfolio() {
           }}
         />
       )}
+    </>
+  );
+}
+
+function MoveCell({ m, loading }) {
+  if (loading) return <span className="text-muted">…</span>;
+  if (!m) return <span className="text-muted" title="No price available for the start of this period">—</span>;
+  return (
+    <>
+      <div className={`num font-semibold ${toneClass(m.change)}`}>{money(m.change, { sign: true })}</div>
+      <span className={`badge num mt-0.5 ${m.change > 0.004 ? 'badge-gain' : m.change < -0.004 ? 'badge-loss' : 'badge-neutral'}`}>{pct(m.pct, { sign: true })}</span>
     </>
   );
 }
@@ -354,7 +446,7 @@ function PerformanceChart() {
     >
       {first && last && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-3">
-          <Legend items={[{ label: 'Market value', color: SERIES[0] }, { label: 'Amount invested', color: SERIES[1], line: true }]} />
+          <Legend items={[{ label: 'Market value', color: FINANCE.deep }, { label: 'Amount invested', color: CHART.axis, line: true }]} />
           <span className="text-sm text-ink-soft">Gap today <b className={`num ${toneClass(last.value - last.cost)}`}>{money(last.value - last.cost, { sign: true })}</b></span>
         </div>
       )}
@@ -364,18 +456,12 @@ function PerformanceChart() {
         {data.length > 0 && (
           <ResponsiveContainer>
             <AreaChart data={data}>
-              <defs>
-                <linearGradient id="valueFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={SERIES[0]} stopOpacity={0.25} />
-                  <stop offset="100%" stopColor={SERIES[0]} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
               <CartesianGrid vertical={false} stroke={CHART.grid} />
               <XAxis dataKey="date" tickFormatter={d => formatDate(d, { year: false })} stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} minTickGap={40} />
               <YAxis tickFormatter={moneyCompact} stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} width={60} domain={['auto', 'auto']} />
               <Tooltip content={<ChartTooltip labelFormatter={d => formatDate(d)} />} />
-              <Area type="monotone" dataKey="value" name="Market value" stroke={SERIES[0]} strokeWidth={2} fill="url(#valueFill)" activeDot={{ r: 5, stroke: CHART.surface, strokeWidth: 2 }} />
-              <Area type="stepAfter" dataKey="cost" name="Amount invested" stroke={SERIES[1]} strokeWidth={2} strokeDasharray="5 4" fill="none" activeDot={{ r: 4, stroke: CHART.surface, strokeWidth: 2 }} />
+              <Area type="monotone" dataKey="value" name="Market value" stroke={FINANCE.deep} strokeWidth={2} fill={FINANCE.soft} fillOpacity={0.85} activeDot={{ r: 5, stroke: CHART.surface, strokeWidth: 2 }} />
+              <Area type="stepAfter" dataKey="cost" name="Amount invested" stroke={CHART.axis} strokeWidth={2} strokeDasharray="5 4" fill="none" activeDot={{ r: 4, stroke: CHART.surface, strokeWidth: 2 }} />
             </AreaChart>
           </ResponsiveContainer>
         )}

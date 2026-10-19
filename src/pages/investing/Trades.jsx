@@ -95,7 +95,7 @@ export default function Trades() {
               <dd className={`num font-semibold ${toneClass(totals.realised)}`}>{money(totals.realised, { sign: true })}</dd>
             </div>
             <div className="flex justify-between py-3">
-              <dt className="font-semibold text-forest-900">Total investing profit</dt>
+              <dt className="font-semibold text-forest-800">Total investing profit</dt>
               <dd className={`num font-bold text-base ${toneClass(totals.net)}`}>{money(totals.net, { sign: true })}</dd>
             </div>
           </dl>
@@ -345,7 +345,7 @@ function TradeForm({ trade, onDone, embedded = false }) {
       {error && <div className="rounded-xl bg-loss-bg text-loss text-sm px-3.5 py-2.5">{error}</div>}
       <div className="flex gap-2 justify-end">
         {embedded && <button type="button" className="btn btn-secondary" onClick={onDone}>Cancel</button>}
-        <button className={`btn ${form.side === 'buy' ? 'btn-primary' : 'btn-gold'} ${embedded ? '' : 'w-full sm:w-auto sm:min-w-[180px]'}`} disabled={saving}>
+        <button className={`btn ${form.side === 'buy' ? 'btn-primary' : 'btn-accent'} ${embedded ? '' : 'w-full sm:w-auto sm:min-w-[180px]'}`} disabled={saving}>
           {saving && <Spinner className="h-4 w-4" />}
           {trade ? 'Save changes' : form.side === 'buy' ? 'Record buy' : 'Record sell'}
         </button>

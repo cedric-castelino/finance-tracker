@@ -1,21 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts';
 import { CameraIcon, Cog6ToothIcon, TrashIcon, PlusIcon, ArrowRightIcon, BuildingLibraryIcon, CheckIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useData } from '../../context/DataContext';
 import { useToast } from '../../context/ToastContext';
 import { PageHeader, SubNav, Stat, Card, Empty, ChartTooltip, Modal, Confirm, Spinner, Delta, Segmented } from '../../components/ui';
 import { money, moneyCompact, toneClass } from '../../lib/format';
 import { addMonths, formatDate, todayISO } from '../../lib/dates';
-import { computeNetWorth, suggestBalances } from '../../lib/networth';
+import { computeNetWorth, suggestBalances, trendForecast } from '../../lib/networth';
 import { SERIES, CHART } from '../../lib/colors';
 import { NETWORTH_NAV } from '../../lib/nav';
+import { Waves } from '../../components/Decor';
 
 const SERIES_DEFS = [
   { key: 'netWorth', label: 'Net worth', color: SERIES[0] },
   { key: 'liquid', label: 'Liquid', color: SERIES[1] },
   { key: 'investments', label: 'Investments', color: SERIES[2] },
   { key: 'netWorthPlusOwed', label: 'Net worth + owed', color: SERIES[3] },
+];
+
+const FORECASTS = [
+  { value: '0', label: 'Off' },
+  { value: '6', label: '6M' },
+  { value: '12', label: '1Y' },
+  { value: '24', label: '2Y' },
 ];
 
 const RANGES = [
@@ -56,6 +64,7 @@ export default function NetWorth() {
   const [deleting, setDeleting] = useState(null);
   const [visible, setVisible] = useState(['netWorth', 'liquid']);
   const [range, setRange] = useState('all');
+  const [forecastMonths, setForecastMonths] = useState('12');
 
   useEffect(() => {
     setDraft(d => {
@@ -78,6 +87,35 @@ export default function NetWorth() {
     const from = range === 'all' ? '0000' : addMonths(todayISO(), -Number(range));
     return sortedSnaps.filter(s => s.date >= from);
   }, [sortedSnaps, range]);
+
+  // Dashed projection for each visible series, from the trend of the snapshots in view.
+  const forecast = useMemo(() => {
+    const months = Number(forecastMonths);
+    if (!months || chartData.length < 2) return null;
+    const byKey = {};
+    for (const s of SERIES_DEFS) {
+      const f = trendForecast(chartData.map(r => ({ date: r.date, value: r[s.key] })), months);
+      if (f) byKey[s.key] = f;
+    }
+    return Object.keys(byKey).length ? byKey : null;
+  }, [chartData, forecastMonths]);
+
+  const plotData = useMemo(() => {
+    const ts = d => Date.parse(`${d}T00:00:00Z`);
+    const rows = chartData.map(r => ({ ...r, ts: ts(r.date) }));
+    if (!forecast || !rows.length) return rows;
+    const last = rows[rows.length - 1];
+    for (const key of Object.keys(forecast)) last[`${key}_f`] = last[key]; // join the dashed line to the real one
+    const future = new Map();
+    for (const [key, f] of Object.entries(forecast)) {
+      for (const r of f.rows) {
+        const row = future.get(r.date) || { date: r.date, ts: ts(r.date) };
+        row[`${key}_f`] = r.value;
+        future.set(r.date, row);
+      }
+    }
+    return [...rows, ...[...future.values()].sort((a, b) => a.ts - b.ts)];
+  }, [chartData, forecast]);
 
   const saveBalances = async () => {
     await saveSettings({ accounts: accounts.map(({ id, name, type, balance, limit }) => ({ id, name, type, balance, limit })) });
@@ -148,7 +186,7 @@ export default function NetWorth() {
         </button>
         {diff != null && (Math.abs(diff) < 0.005
           ? <span className="inline-flex items-center gap-1 text-gain shrink-0"><CheckIcon className="h-3.5 w-3.5" />Matches</span>
-          : <span className="num font-semibold text-gold-600 shrink-0">{money(diff, { sign: true })} vs suggested</span>)}
+          : <span className="num font-semibold text-forest-800 bg-forest-100 rounded-md px-1.5 py-0.5 shrink-0">{money(diff, { sign: true })} vs suggested</span>)}
       </div>
     );
   };
@@ -203,7 +241,7 @@ export default function NetWorth() {
               {suggestions
                 ? <>Suggestions start from your <b className="text-ink-soft">{formatDate(suggestions.since)}</b> snapshot and add the transactions logged to each account since. Tap one to use it.</>
                 : <>Save a snapshot and next time you’ll see a suggested balance for each account, based on the transactions you’ve logged since.</>}
-              {suggestions?.unassigned > 0 && <span className="block mt-1 text-gold-600">{suggestions.unassigned} transaction{suggestions.unassigned === 1 ? '' : 's'} since then {suggestions.unassigned === 1 ? 'has' : 'have'} no account, so {suggestions.unassigned === 1 ? 'it isn’t' : 'they aren’t'} included.</span>}
+              {suggestions?.unassigned > 0 && <span className="block mt-1 text-forest-800 font-semibold">{suggestions.unassigned} transaction{suggestions.unassigned === 1 ? '' : 's'} since then {suggestions.unassigned === 1 ? 'has' : 'have'} no account, so {suggestions.unassigned === 1 ? 'it isn’t' : 'they aren’t'} included.</span>}
             </p>
             <section>
               <div className="flex justify-between text-[12px] font-semibold uppercase tracking-[0.08em] text-muted mb-2">
@@ -284,22 +322,38 @@ export default function NetWorth() {
               <button className="btn btn-secondary flex-1" onClick={onSaveBalances} disabled={!dirty || saving}>Save balances</button>
               <button className="btn btn-primary flex-1" onClick={snapshot} disabled={saving}><CameraIcon className="h-4 w-4" /> Save snapshot</button>
             </div>
-            {dirty && <p className="text-xs text-gold-600 -mt-2">Unsaved balance changes.</p>}
+            {dirty && <p className="text-xs text-forest-800 font-semibold -mt-2">Unsaved balance changes.</p>}
           </div>
         </Card>
 
         <Card title="Net worth over time" action={<Segmented value={range} onChange={setRange} options={RANGES} />}>
-          <div className="flex flex-wrap gap-2 mb-3">
+          {forecast?.netWorth && (
+            <div className="relative overflow-hidden rounded-[14px] bg-forest-100 border border-forest-200 px-4 py-3 mb-4">
+              <Waves corner="br" tones={['#e4efe7', '#cde0d4', '#a3c6b2']} className="w-32 h-full" />
+              <div className="relative text-[12px] font-bold uppercase tracking-[0.12em] text-forest-800">Forecast</div>
+              <div className="relative text-sm text-ink-soft mt-0.5 pr-24">
+                At your average pace of <b className={`num ${toneClass(forecast.netWorth.perMonth)}`}>{money(forecast.netWorth.perMonth, { sign: true })}/month</b>,
+                net worth could reach <b className="num text-forest-800">{money(forecast.netWorth.end.value)}</b> by {formatDate(forecast.netWorth.end.date)}.
+              </div>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
             {SERIES_DEFS.map(s => {
               const on = visible.includes(s.key);
               return (
-                <button key={s.key} className={`chip !h-8 ${on ? '!border-forest-800 !text-forest-900 !bg-forest-50' : 'opacity-70'}`} aria-pressed={on}
+                <button key={s.key} className={`chip !h-8 ${on ? '!border-forest-800 !text-forest-800 !bg-forest-50' : 'opacity-70'}`} aria-pressed={on}
                   onClick={() => setVisible(v => (on ? (v.length > 1 ? v.filter(k => k !== s.key) : v) : [...SERIES_DEFS.map(d => d.key).filter(k => v.includes(k) || k === s.key)]))}>
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: on ? s.color : '#c9b891' }} />
                   {s.label}
                 </button>
               );
             })}
+            {chartData.length >= 2 && (
+              <div className="flex items-center gap-2 sm:ml-auto">
+                <span className="text-[12px] font-bold uppercase tracking-[0.12em] text-forest-800">Forecast</span>
+                <Segmented value={forecastMonths} onChange={setForecastMonths} options={FORECASTS} className="[&>button]:!h-8 [&>button]:!px-3" />
+              </div>
+            )}
           </div>
           {chartData.length < 2 ? (
             <Empty icon={BuildingLibraryIcon} title={chartData.length ? 'One snapshot so far' : 'No snapshots yet'}>
@@ -308,13 +362,20 @@ export default function NetWorth() {
           ) : (
             <div className="h-[300px] -ml-2">
               <ResponsiveContainer>
-                <LineChart data={chartData}>
+                <LineChart data={plotData}>
                   <CartesianGrid vertical={false} stroke={CHART.grid} />
-                  <XAxis dataKey="date" tickFormatter={d => formatDate(d, { year: false })} stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} minTickGap={30} />
+                  <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']}
+                    tickFormatter={t => { const d = new Date(t).toISOString().slice(0, 10); return formatDate(d, { year: d.slice(0, 4) !== todayISO().slice(0, 4) }); }}
+                    stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} minTickGap={36} />
                   <YAxis tickFormatter={moneyCompact} stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} width={60} domain={['auto', 'auto']} />
-                  <Tooltip content={<ChartTooltip labelFormatter={d => formatDate(d)} />} />
+                  <Tooltip content={<ChartTooltip labelFormatter={t => formatDate(new Date(t).toISOString().slice(0, 10))} />} />
+                  {forecast && <ReferenceLine x={plotData[chartData.length - 1]?.ts} stroke={CHART.axis} strokeDasharray="2 4" label={{ value: 'Last snapshot', position: 'insideTopRight', fill: CHART.axis, fontSize: 11 }} />}
+                  {forecast && SERIES_DEFS.filter(s => visible.includes(s.key) && forecast[s.key]).map(s => (
+                    <Line key={`${s.key}_f`} type="linear" dataKey={`${s.key}_f`} name={`${s.label} (forecast)`} stroke={s.color} strokeWidth={2}
+                      strokeDasharray="6 5" strokeOpacity={0.85} dot={false} connectNulls activeDot={{ r: 4, stroke: CHART.surface, strokeWidth: 2 }} legendType="none" />
+                  ))}
                   {SERIES_DEFS.filter(s => visible.includes(s.key)).map(s => (
-                    <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2.25}
+                    <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2.25} connectNulls
                       dot={chartData.length < 30 ? { r: 3.5, fill: s.color, stroke: CHART.surface, strokeWidth: 2 } : false}
                       activeDot={{ r: 5, stroke: CHART.surface, strokeWidth: 2 }} />
                   ))}

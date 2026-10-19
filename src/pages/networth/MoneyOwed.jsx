@@ -148,7 +148,7 @@ export default function MoneyOwed() {
                       <div className="text-xs text-muted">{p.open.length} open{p.settled.length ? ` · ${p.settled.length} repaid` : ''}</div>
                     </div>
                     <div className="text-right">
-                      <div className={`num font-semibold text-lg ${p.outstanding > 0 ? 'text-forest-900' : 'text-muted'}`}>{money(p.outstanding)}</div>
+                      <div className={`num font-semibold text-lg ${p.outstanding > 0 ? 'text-forest-800' : 'text-muted'}`}>{money(p.outstanding)}</div>
                       {p.open.length > 1 && <button className="text-xs font-semibold text-forest-700 hover:underline" onClick={() => setSettlePerson(p)}>Settle all</button>}
                     </div>
                   </div>

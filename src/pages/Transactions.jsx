@@ -149,7 +149,7 @@ export default function Transactions() {
           <button className={`btn btn-secondary relative ${showFilters ? '!bg-forest-100' : ''}`} onClick={() => setShowFilters(s => !s)} aria-expanded={showFilters}>
             <AdjustmentsHorizontalIcon className="h-5 w-5" />
             <span className="hidden sm:inline">Filters</span>
-            {activeFilters > 0 && <span className="absolute -top-1.5 -right-1.5 h-5 min-w-5 px-1 rounded-full bg-gold-500 text-forest-950 text-[11px] font-bold grid place-items-center">{activeFilters}</span>}
+            {activeFilters > 0 && <span className="absolute -top-1.5 -right-1.5 h-5 min-w-5 px-1 rounded-full bg-forest-500 text-white text-[11px] font-bold grid place-items-center">{activeFilters}</span>}
           </button>
         </div>
         {showFilters && (
@@ -225,13 +225,13 @@ export default function Transactions() {
                     {g.items.map(t => (
                       <li key={t.id} className="border-b border-line/70 last:border-b-0">
                         <button onClick={() => setEditing(t)} className="w-full flex items-center gap-3 px-4 md:px-5 py-3 text-left hover:bg-cream-50 transition">
-                          <span className={`h-10 w-10 rounded-xl grid place-items-center shrink-0 ${t.type === 'income' ? 'bg-gain-bg text-gain' : 'bg-forest-100 text-forest-700'}`}>
+                          <span className={`h-10 w-10 rounded-full grid place-items-center shrink-0 ${t.type === 'income' ? 'bg-gain-bg text-gain' : 'bg-forest-100 text-forest-700'}`}>
                             <CategoryIcon icon={iconFor[`${t.type}:${t.category}`]} className="h-5 w-5" />
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-2 min-w-0">
                               <span className="font-semibold text-ink truncate">{t.title}</span>
-                              {t.type === 'expense' && excluded.has(t.category) && <span className="badge bg-cream-200 text-gold-600 shrink-0">Not spending</span>}
+                              {t.type === 'expense' && excluded.has(t.category) && <span className="badge bg-forest-100 text-forest-800 shrink-0">Not spending</span>}
                               {t.recurringId && <span className="badge badge-neutral shrink-0" title="Added by a repeat transaction"><ArrowPathIcon className="h-3 w-3" />Repeat</span>}
                             </span>
                             <span className="block text-[13px] text-muted truncate">

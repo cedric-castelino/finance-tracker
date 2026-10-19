@@ -4,6 +4,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import Logo from './Logo';
+import { Waves, Dots } from './Decor';
 
 const NAV = [
   { to: '/add', label: 'Add Transaction', short: 'Add', icon: PlusCircleIcon },
@@ -16,9 +17,10 @@ const NAV = [
 function Sidebar() {
   const { user } = useAuth();
   return (
-    <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col bg-forest-900 text-cream-100 z-30">
+    <aside className="hidden lg:flex fixed inset-y-0 left-0 w-64 flex-col bg-cream-100 border-r border-line text-ink z-30 overflow-hidden">
       <div className="px-6 pt-7 pb-8">
-        <Logo />
+        <Logo dark />
+        <Dots count={4} className="mt-4 ml-0.5" />
       </div>
       <nav className="flex-1 px-3 space-y-1">
         {NAV.map(({ to, label, icon: Icon }) => (
@@ -26,8 +28,8 @@ function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium transition ${
-                isActive ? 'bg-forest-700 text-white shadow-inner' : 'text-cream-200/80 hover:bg-forest-800 hover:text-white'
+              `flex items-center gap-3 rounded-full px-4 py-2.5 text-[14px] font-semibold transition ${
+                isActive ? 'bg-forest-800 text-white' : 'text-ink-soft hover:bg-forest-100 hover:text-forest-800'
               }`
             }
           >
@@ -36,12 +38,13 @@ function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="p-3 border-t border-white/10">
+      <div className="relative p-3 pb-28">
+        <Waves corner="bl" className="w-full h-24" />
         <NavLink
           to="/settings"
           className={({ isActive }) =>
-            `flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium transition ${
-              isActive ? 'bg-forest-700 text-white' : 'text-cream-200/80 hover:bg-forest-800 hover:text-white'
+            `flex items-center gap-3 rounded-full px-4 py-2.5 text-[14px] font-semibold transition ${
+              isActive ? 'bg-forest-800 text-white' : 'text-ink-soft hover:bg-forest-100 hover:text-forest-800'
             }`
           }
         >
@@ -49,12 +52,12 @@ function Sidebar() {
           Settings
         </NavLink>
         <div className="flex items-center gap-3 px-3.5 pt-4 pb-2">
-          <div className="h-9 w-9 rounded-full bg-gold-500 text-forest-950 grid place-items-center font-semibold">
+          <div className="h-9 w-9 rounded-full bg-forest-800 text-white grid place-items-center font-semibold">
             {(user?.firstName || '?').slice(0, 1).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-white truncate">{user?.firstName} {user?.lastName}</div>
-            <div className="text-xs text-cream-200/60 truncate">{user?.email}</div>
+            <div className="text-sm font-semibold text-ink truncate">{user?.firstName} {user?.lastName}</div>
+            <div className="text-xs text-ink-soft truncate">{user?.email}</div>
           </div>
         </div>
       </div>
@@ -64,10 +67,10 @@ function Sidebar() {
 
 function MobileHeader() {
   return (
-    <header className="lg:hidden sticky top-0 z-30 bg-forest-900 text-cream-50 safe-top">
+    <header className="lg:hidden sticky top-0 z-30 bg-cream-50/95 backdrop-blur border-b border-line text-ink safe-top">
       <div className="flex items-center justify-between h-14 px-4">
-        <Logo compact />
-        <Link to="/settings" aria-label="Settings" className="h-10 w-10 -mr-2 grid place-items-center rounded-full hover:bg-white/10">
+        <Logo compact dark />
+        <Link to="/settings" aria-label="Settings" className="h-10 w-10 -mr-2 grid place-items-center rounded-full text-forest-800 hover:bg-forest-100">
           <Cog6ToothIcon className="h-6 w-6" />
         </Link>
       </div>
@@ -78,13 +81,13 @@ function MobileHeader() {
 function TabBar() {
   const items = [NAV[1], NAV[2], NAV[0], NAV[3], NAV[4]];
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-line safe-bottom">
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-line safe-bottom">
       <div className="grid grid-cols-5 h-[64px]">
         {items.map(({ to, short, icon: Icon }) =>
           to === '/add' ? (
             <NavLink key={to} to={to} aria-label="Add transaction" className="flex items-center justify-center">
               {({ isActive }) => (
-                <span className={`-mt-6 h-14 w-14 rounded-full grid place-items-center shadow-lg ring-4 ring-cream-50 transition ${isActive ? 'bg-gold-500 text-forest-950' : 'bg-forest-800 text-cream-50'}`}>
+                <span className={`-mt-6 h-14 w-14 rounded-full grid place-items-center ring-4 ring-cream-50 transition ${isActive ? 'bg-forest-500 text-white' : 'bg-forest-800 text-white'}`}>
                   <PlusIcon className="h-7 w-7" strokeWidth={2.2} />
                 </span>
               )}
@@ -112,8 +115,9 @@ export default function Layout() {
     <div className="min-h-dvh">
       <Sidebar />
       <MobileHeader />
-      <main className="lg:pl-64">
-        <div className="mx-auto max-w-[1280px] px-4 md:px-6 lg:px-10 pt-5 lg:pt-9 pb-tabbar">
+      <main className="relative lg:pl-64 overflow-x-clip">
+        <Waves corner="tr" className="w-36 h-14 md:w-80 md:h-24 opacity-95" />
+        <div className="relative mx-auto max-w-[1280px] px-4 md:px-6 lg:px-10 pt-5 lg:pt-9 pb-tabbar">
           <Outlet />
         </div>
       </main>

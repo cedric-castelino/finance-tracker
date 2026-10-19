@@ -55,3 +55,41 @@ export function suggestBalances(snapshot, accounts = [], transactions = [], debt
     unassigned: after.filter(t => !known.has((t.account || '').trim().toLowerCase())).length,
   };
 }
+
+// Least-squares trend through dated values, projected forward `months` from the last point.
+// The projection starts at the latest actual value so the dashed line continues the real one.
+export function trendForecast(points, months, stepDays = 7) {
+  const pts = points.filter(p => Number.isFinite(p.value));
+  if (pts.length < 2) return null;
+  const day = d => Date.parse(`${d}T00:00:00Z`) / 86400000;
+  const xs = pts.map(p => day(p.date));
+  const span = xs[xs.length - 1] - xs[0];
+  if (span < 7) return null; // need at least a week of history for a meaningful pace
+  const mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const my = pts.reduce((a, p) => a + p.value, 0) / pts.length;
+  let num = 0, den = 0;
+  xs.forEach((x, i) => { num += (x - mx) * (pts[i].value - my); den += (x - mx) ** 2; });
+  const slopePerDay = den ? num / den : 0;
+  const last = pts[pts.length - 1];
+  const lastDay = xs[xs.length - 1];
+  const endDay = day(addMonthsISO(last.date, months));
+  const rows = [];
+  for (let d = lastDay + stepDays; d < endDay; d += stepDays) rows.push({ day: d, value: last.value + slopePerDay * (d - lastDay) });
+  rows.push({ day: endDay, value: last.value + slopePerDay * (endDay - lastDay) });
+  const iso = d => new Date(d * 86400000).toISOString().slice(0, 10);
+  return {
+    slopePerDay,
+    perMonth: slopePerDay * 30.44,
+    end: { date: iso(endDay), value: rows[rows.length - 1].value },
+    rows: rows.map(r => ({ date: iso(r.day), value: r.value })),
+  };
+}
+
+function addMonthsISO(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const total = y * 12 + (m - 1) + n;
+  const ny = Math.floor(total / 12);
+  const nm = total % 12;
+  const dim = new Date(Date.UTC(ny, nm + 1, 0)).getUTCDate();
+  return `${ny}-${String(nm + 1).padStart(2, '0')}-${String(Math.min(d, dim)).padStart(2, '0')}`;
+}
