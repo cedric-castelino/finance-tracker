@@ -105,3 +105,47 @@ export function parseLooseDate(input) {
   }
   return null;
 }
+
+// Evenly spaced, calendar-aligned axis ticks for a time range (ms timestamps), picking the
+// smallest step (weeks → months → years) whose labels fit in `width` pixels.
+const TICK_STEPS = [
+  { unit: 'day', n: 7 }, { unit: 'day', n: 14 },
+  { unit: 'month', n: 1 }, { unit: 'month', n: 2 }, { unit: 'month', n: 3 }, { unit: 'month', n: 6 },
+  { unit: 'year', n: 1 }, { unit: 'year', n: 2 }, { unit: 'year', n: 5 },
+];
+
+export function timeTicks(minTs, maxTs, width, minGap = 64) {
+  if (!(maxTs > minTs)) return { ticks: [minTs], format: t => formatDate(new Date(t).toISOString().slice(0, 10)) };
+  const maxTicks = Math.max(2, Math.floor(width / minGap));
+  const utc = t => new Date(t);
+  for (const step of TICK_STEPS) {
+    const ticks = [];
+    const start = utc(minTs);
+    let d;
+    if (step.unit === 'day') {
+      d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+      while (d.getUTCDay() !== 1 || d.getTime() < minTs) d.setUTCDate(d.getUTCDate() + 1); // first Monday in range
+      for (; d.getTime() <= maxTs; d.setUTCDate(d.getUTCDate() + step.n)) ticks.push(d.getTime());
+    } else if (step.unit === 'month') {
+      d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
+      while (d.getTime() < minTs || d.getUTCMonth() % step.n) d.setUTCMonth(d.getUTCMonth() + 1);
+      for (; d.getTime() <= maxTs; d.setUTCMonth(d.getUTCMonth() + step.n)) ticks.push(d.getTime());
+    } else {
+      d = new Date(Date.UTC(start.getUTCFullYear(), 0, 1));
+      while (d.getTime() < minTs || d.getUTCFullYear() % step.n) d.setUTCFullYear(d.getUTCFullYear() + 1);
+      for (; d.getTime() <= maxTs; d.setUTCFullYear(d.getUTCFullYear() + step.n)) ticks.push(d.getTime());
+    }
+    if (ticks.length < 2 || ticks.length > maxTicks) continue;
+    const format = t => {
+      const x = utc(t);
+      const mon = MONTHS[x.getUTCMonth()];
+      if (step.unit === 'day') return `${x.getUTCDate()} ${mon}`;
+      if (step.unit === 'year') return String(x.getUTCFullYear());
+      // Month steps: show the year on January and on the first tick so the span is clear.
+      return x.getUTCMonth() === 0 || t === ticks[0] ? `${mon} ’${String(x.getUTCFullYear()).slice(2)}` : mon;
+    };
+    return { ticks, format };
+  }
+  // Fallback for very long spans: first and last date only.
+  return { ticks: [minTs, maxTs], format: t => String(utc(t).getUTCFullYear()) };
+}

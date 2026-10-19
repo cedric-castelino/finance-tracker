@@ -6,7 +6,7 @@ import { useData } from '../../context/DataContext';
 import { useToast } from '../../context/ToastContext';
 import { PageHeader, SubNav, Stat, Card, Empty, ChartTooltip, Modal, Confirm, Spinner, Delta, Segmented } from '../../components/ui';
 import { money, moneyCompact, toneClass } from '../../lib/format';
-import { addMonths, formatDate, todayISO } from '../../lib/dates';
+import { addMonths, formatDate, timeTicks, todayISO } from '../../lib/dates';
 import { computeNetWorth, suggestBalances, trendForecast } from '../../lib/networth';
 import { SERIES, CHART } from '../../lib/colors';
 import { NETWORTH_NAV } from '../../lib/nav';
@@ -100,6 +100,17 @@ export default function NetWorth() {
     return Object.keys(byKey).length ? byKey : null;
   }, [chartData, forecastMonths]);
 
+  // Width of the chart, so the axis can choose a tick step whose labels don't collide.
+  const chartBox = useRef(null);
+  const [chartWidth, setChartWidth] = useState(600);
+  useEffect(() => {
+    const el = chartBox.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => setChartWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [chartData.length]);
+
   const plotData = useMemo(() => {
     const ts = d => Date.parse(`${d}T00:00:00Z`);
     const rows = chartData.map(r => ({ ...r, ts: ts(r.date) }));
@@ -116,6 +127,12 @@ export default function NetWorth() {
     }
     return [...rows, ...[...future.values()].sort((a, b) => a.ts - b.ts)];
   }, [chartData, forecast]);
+
+  const xTicks = useMemo(() => {
+    if (plotData.length < 2) return null;
+    // Plot area is the container minus the y-axis (60px) and side margins.
+    return timeTicks(plotData[0].ts, plotData[plotData.length - 1].ts, Math.max(160, chartWidth - 84));
+  }, [plotData, chartWidth]);
 
   const saveBalances = async () => {
     await saveSettings({ accounts: accounts.map(({ id, name, type, balance, limit }) => ({ id, name, type, balance, limit })) });
@@ -360,22 +377,22 @@ export default function NetWorth() {
               Press <b>Save snapshot</b> whenever you update your balances — weekly or monthly works well. Your chart builds from there.
             </Empty>
           ) : (
-            <div className="h-[300px] -ml-2">
+            <div ref={chartBox} className="h-[310px] -ml-2">
               <ResponsiveContainer>
-                <LineChart data={plotData}>
+                <LineChart data={plotData} margin={{ top: forecast ? 22 : 8, right: 18, bottom: 0, left: 0 }}>
                   <CartesianGrid vertical={false} stroke={CHART.grid} />
                   <XAxis dataKey="ts" type="number" scale="time" domain={['dataMin', 'dataMax']}
-                    tickFormatter={t => { const d = new Date(t).toISOString().slice(0, 10); return formatDate(d, { year: d.slice(0, 4) !== todayISO().slice(0, 4) }); }}
-                    stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} minTickGap={36} />
+                    ticks={xTicks?.ticks} tickFormatter={t => xTicks?.format(t) ?? ''} interval={0}
+                    stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} tickMargin={8} />
                   <YAxis tickFormatter={moneyCompact} stroke={CHART.axis} fontSize={12} tickLine={false} axisLine={false} width={60} domain={['auto', 'auto']} />
                   <Tooltip content={<ChartTooltip labelFormatter={t => formatDate(new Date(t).toISOString().slice(0, 10))} />} />
-                  {forecast && <ReferenceLine x={plotData[chartData.length - 1]?.ts} stroke={CHART.axis} strokeDasharray="2 4" label={{ value: 'Last snapshot', position: 'insideTopRight', fill: CHART.axis, fontSize: 11 }} />}
+                  {forecast && <ReferenceLine x={plotData[chartData.length - 1]?.ts} stroke={CHART.axis} strokeDasharray="2 4" label={{ value: 'Last snapshot', position: 'top', fill: CHART.axis, fontSize: 11 }} />}
                   {forecast && SERIES_DEFS.filter(s => visible.includes(s.key) && forecast[s.key]).map(s => (
                     <Line key={`${s.key}_f`} type="linear" dataKey={`${s.key}_f`} name={`${s.label} (forecast)`} stroke={s.color} strokeWidth={2}
-                      strokeDasharray="6 5" strokeOpacity={0.85} dot={false} connectNulls activeDot={{ r: 4, stroke: CHART.surface, strokeWidth: 2 }} legendType="none" />
+                      strokeDasharray="6 5" strokeOpacity={0.85} dot={false} connectNulls isAnimationActive={false} activeDot={{ r: 4, stroke: CHART.surface, strokeWidth: 2 }} legendType="none" />
                   ))}
                   {SERIES_DEFS.filter(s => visible.includes(s.key)).map(s => (
-                    <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2.25} connectNulls
+                    <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2.25} connectNulls isAnimationActive={false}
                       dot={chartData.length < 30 ? { r: 3.5, fill: s.color, stroke: CHART.surface, strokeWidth: 2 } : false}
                       activeDot={{ r: 5, stroke: CHART.surface, strokeWidth: 2 }} />
                   ))}
